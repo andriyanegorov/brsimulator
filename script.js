@@ -119,7 +119,8 @@ function saveState(state) {
         server: p.server,
         balance: p.balance,
         inventory: p.inventory,
-        stats: p.stats
+        stats: p.stats,
+        usedPromos: p.usedPromos || []
       }));
       await supabaseClient.from('players').upsert(playersPayload);
 
@@ -174,7 +175,8 @@ async function fetchStateFromSupabase() {
         server: p.server,
         balance: p.balance,
         inventory: p.inventory || [],
-        stats: p.stats || { opened: 0 }
+        stats: p.stats || { opened: 0 },
+        usedPromos: p.usedPromos || []
       }));
     }
 
