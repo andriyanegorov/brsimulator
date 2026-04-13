@@ -80,7 +80,9 @@ create index if not exists idx_promocodes_active on public.promocodes(is_active)
 alter table if exists public.config
   add column if not exists admin_ids jsonb not null default '[]'::jsonb,
   add column if not exists topic_ids jsonb not null default '{}'::jsonb,
-  add column if not exists promocodes jsonb not null default '[]'::jsonb;
+  add column if not exists promocodes jsonb not null default '[]'::jsonb,
+  add column if not exists gallery_entries jsonb not null default '[]'::jsonb,
+  add column if not exists global_chat jsonb not null default '[]'::jsonb;
 
 -- Ensure global config row exists.
 insert into public.config (id)

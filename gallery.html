@@ -44,6 +44,13 @@
           </div>
         </div>
       </div>
+      <div id="bannedBanner" class="banned-banner" aria-live="assertive" aria-hidden="true">
+        <div class="banned-card">
+          <div class="banned-tag">Заблокировано</div>
+          <h2>Ваш аккаунт заблокирован администрацией</h2>
+          <p>Доступ к проекту ограничен. Обратитесь к администрации для разблокировки.</p>
+        </div>
+      </div>
       <main class="content">
         <section class="view active" data-view="gallery">
           <section class="block glass gallery-block">
@@ -96,6 +103,70 @@
         <a class="more-nav-item" href="donate.html" data-target="donate">💎 Донат</a>
       </div>
     </div>
+
+    <div class="modal" id="galleryModal" aria-hidden="true" style="z-index: 180;">
+      <div class="modal-card gallery-modal-card">
+        <p class="kicker">Выбор предмета</p>
+        <h3 style="margin-bottom: 8px;">Добавление на выставку</h3>
+        <p style="font-size: 13px; color: #8aa7c7; margin-bottom: 16px;">Выберите предмет из инвентаря. Он останется в вашем инвентаре, но появится на витрине до тех пор, пока вы его не снимете.</p>
+        <div class="gallery-modal-body" id="galleryInventoryList"></div>
+        <button class="btn btn-ghost" id="closeGalleryModalBtn" type="button" style="margin-top: 16px;">Закрыть</button>
+      </div>
+    </div>
+
+    <div class="modal" id="itemDetailModal" aria-hidden="true" style="z-index:200;">
+      <div class="item-detail-card" id="itemDetailCard">
+        <button class="item-detail-close" id="closeItemDetailModal" type="button" aria-label="Закрыть">✕</button>
+        <div class="item-detail-img-section" id="itemDetailImgSection">
+          <span class="item-detail-sticker" id="itemDetailSticker"></span>
+          <span class="item-detail-promoted-badge" id="itemDetailPromotedBadge">🔝 ТОП</span>
+          <img class="item-detail-img" id="itemDetailImg" src="" alt="">
+          <span class="item-detail-rarity-pill" id="itemDetailRarityPill"></span>
+        </div>
+        <div class="item-detail-body">
+          <div class="item-detail-name-row">
+            <p class="item-detail-name" id="itemDetailName"></p>
+          </div>
+          <p class="item-detail-caption" id="itemDetailCaption"></p>
+          <div class="item-detail-row">
+            <span class="item-detail-price" id="itemDetailPrice"></span>
+            <button class="gallery-like-btn item-detail-like-btn" id="itemDetailLikeBtn" type="button">
+              <span id="itemDetailLikeIcon">♡</span>
+              <strong id="itemDetailLikeCount">0</strong>
+            </button>
+          </div>
+          <div class="item-detail-divider"></div>
+          <div class="item-detail-owner-row">
+            <div class="gallery-owner-avatar">👤</div>
+            <div>
+              <div class="gallery-owner-nick" id="itemDetailOwnerNick"></div>
+              <div class="gallery-owner-server" id="itemDetailOwnerServer"></div>
+            </div>
+          </div>
+          <p class="item-detail-date" id="itemDetailDate"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="customizeModal" aria-hidden="true" style="z-index: 190;">
+      <div class="modal-card customize-modal-card">
+        <div class="customize-modal-header">
+          <div class="customize-modal-title-group">
+            <p class="kicker">Витрина</p>
+            <h3>Оформление лота</h3>
+            <p id="customizeEntryName" class="customize-entry-name">—</p>
+          </div>
+          <div class="customize-balance-chip">
+            <span>💰</span>
+            <span id="customizeBalance">0 BC</span>
+          </div>
+        </div>
+        <div id="customizeOptionsContainer" class="customize-options-container"></div>
+        <button class="btn btn-ghost" id="closeCustomizeModalBtn" type="button" style="margin-top: 16px; width: 100%;">Закрыть</button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
   </body>

@@ -446,21 +446,40 @@ function loadState() {
     window.state = state;
     return state;
   }
+  const savedLocal = loadLocalState();
+  if (savedLocal) {
+    window.state = savedLocal;
+    return savedLocal;
+  }
   const state = cloneDefaultState();
   window.state = state;
   return state;
+}
+
+function loadLocalState() {
+  try {
+    const raw = localStorage.getItem('br_sim_state');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.state) return null;
+    return ensureStateShape(parsed.state);
+  } catch (err) {
+    return null;
+  }
 }
 
 function showPageLoader() {
   const loader = document.getElementById("pageLoader");
   if (!loader) return;
   loader.classList.remove("hidden");
+  document.body.classList.add("page-loading");
 }
 
 function hidePageLoader() {
   const loader = document.getElementById("pageLoader");
   if (!loader) return;
   loader.classList.add("hidden");
+  document.body.classList.remove("page-loading");
 }
 
 function initPageLoader() {
@@ -506,67 +525,84 @@ function initPageLoader() {
 }
 
 function saveState(state) {
+  // Persist immediately to localStorage, then sync to Supabase with debounce.
+  try {
+    localStorage.setItem('br_sim_state', JSON.stringify({ savedAt: Date.now(), state }));
+  } catch (err) {
+    // Ignore local storage failures.
+  }
+
   globalState = JSON.parse(JSON.stringify(state));
   window.state = state;
   
   if (syncTimeout) clearTimeout(syncTimeout);
-  syncTimeout = setTimeout(async () => {
-    try {
-      // 1. Конфиг
-      await supabaseClient.from('config').upsert({
-        id: 'global',
-        rarity_chances: state.rarityChances,
-        promocodes: state.promocodes,
-        gallery_entries: state.galleryEntries,
-        case_categories: state.caseCategories
-      });
+  syncTimeout = setTimeout(() => syncStateToSupabase(state), 300);
+}
 
-      // 2. Игроки
-      const playersPayload = state.players.map(p => ({
-        id: p.id,
-        nick: p.nick,
-        server: p.server,
-        balance: p.balance,
-        inventory: p.inventory,
-        stats: p.stats,
-        total_spent: Math.max(0, Math.round(p.totalSpent || 0)),
-        badges:        p.badges        || [],
-        usedPromos:    p.usedPromos    || [],
-        dailyBonus:    p.dailyBonus    || { lastClaim: 0, streak: 0 },
-        wheelLastSpun: p.wheelLastSpun || 0,
-        banned:        p.banned || false
-      }));
-      await supabaseClient.from('players').upsert(playersPayload);
+async function syncStateToSupabase(state) {
+  try {
+    // 1. Конфиг
+    await supabaseClient.from('config').upsert({
+      id: 'global',
+      rarity_chances: state.rarityChances,
+      promocodes: state.promocodes,
+      gallery_entries: state.galleryEntries,
+      case_categories: state.caseCategories
+    });
 
-      // 3. Кейсы
-      const casesPayload = state.cases.map(c => ({
-        id: c.id,
-        name: c.name,
-        price: c.price,
-        image: c.image,
-        items: c.items,
-        category_id: c.categoryId || null
-      }));
-      const { error: casesErr } = await supabaseClient.from('cases').upsert(casesPayload);
-      if (casesErr) {
-        console.group('%c❌ Ошибка БД: Отправка кейсов (Supabase)', 'color: white; background: red; padding: 4px; border-radius: 4px;');
-        console.error(casesErr);
-        console.groupEnd();
-      }
+    // 2. Игроки
+    const playersPayload = state.players.map(p => ({
+      id: p.id,
+      nick: p.nick,
+      server: p.server,
+      balance: p.balance,
+      inventory: p.inventory,
+      stats: p.stats,
+      total_spent: Math.max(0, Math.round(p.totalSpent || 0)),
+      badges:        p.badges        || [],
+      usedPromos:    p.usedPromos    || [],
+      dailyBonus:    p.dailyBonus    || { lastClaim: 0, streak: 0 },
+      wheelLastSpun: p.wheelLastSpun || 0,
+      banned:        p.banned || false
+    }));
+    await supabaseClient.from('players').upsert(playersPayload);
 
-      // 4. Новости
-      await supabaseClient.from('news').delete().neq('id', 0);
-      const newsPayload = state.news.map((content) => ({ content }));
-      if(newsPayload.length > 0) {
-        await supabaseClient.from('news').insert(newsPayload);
-      }
-    } catch (err) {
-      console.group('%c❌ Критическая ошибка: Синхронизация с Supabase', 'color: white; background: red; padding: 4px; border-radius: 4px;');
-      console.error(err);
+    // 3. Кейсы
+    const casesPayload = state.cases.map(c => ({
+      id: c.id,
+      name: c.name,
+      price: c.price,
+      image: c.image,
+      items: c.items,
+      category_id: c.categoryId || null
+    }));
+    const { error: casesErr } = await supabaseClient.from('cases').upsert(casesPayload);
+    if (casesErr) {
+      console.group('%c❌ Ошибка БД: Отправка кейсов (Supabase)', 'color: white; background: red; padding: 4px; border-radius: 4px;');
+      console.error(casesErr);
       console.groupEnd();
     }
-  }, 1000); // Debounce на 1 секунду чтобы не спамить БД
+
+    // 4. Новости
+    await supabaseClient.from('news').delete().neq('id', 0);
+    const newsPayload = state.news.map((content) => ({ content }));
+    if(newsPayload.length > 0) {
+      await supabaseClient.from('news').insert(newsPayload);
+    }
+  } catch (err) {
+    console.group('%c❌ Критическая ошибка: Синхронизация с Supabase', 'color: white; background: red; padding: 4px; border-radius: 4px;');
+    console.error(err);
+    console.groupEnd();
+  }
 }
+
+window.addEventListener('beforeunload', () => {
+  if (syncTimeout) {
+    clearTimeout(syncTimeout);
+    syncTimeout = null;
+    syncStateToSupabase(window.state);
+  }
+});
 
 async function fetchStateFromSupabase() {
   try {
@@ -667,7 +703,8 @@ function ensureStateShape(state) {
           value: Number(entry.value || 0),
           likes: Number(entry.likes || 0),
           likedBy: Array.isArray(entry.likedBy) ? entry.likedBy : [],
-          createdAt: entry.createdAt || nowTs
+          createdAt: entry.createdAt || nowTs,
+          custom: (entry.custom && typeof entry.custom === 'object') ? entry.custom : {}
         }))
     : [];
 
@@ -1391,10 +1428,25 @@ function renderMainApp() {
     const slotsHtml = [
       ...visibleEntries.map((entry) => {
         const rarity = rarityClass(entry.rarity || "gray");
+        const custom = entry.custom || {};
+        const inlineStyles = [];
+        if (custom.bgValue) inlineStyles.push(`background: ${custom.bgValue}`);
+        if (custom.glowValue) inlineStyles.push(`box-shadow: 0 0 28px ${custom.glowValue}, 0 20px 40px rgba(0,0,0,0.4)`);
+        const styleAttr = inlineStyles.length ? ` style="${inlineStyles.join('; ')}"` : "";
+        const titleStyle = custom.nameColorValue ? ` style="color: ${custom.nameColorValue}"` : "";
+        const stickerHtml = custom.stickerValue ? `<span class="gallery-sticker">${escapeHtml(custom.stickerValue)}</span>` : "";
+        const badgeHtml = custom.badge
+          ? `<span class="gallery-rarity-pill gallery-custom-badge">${escapeHtml(custom.badge)}</span>`
+          : `<span class="gallery-rarity-pill preview-rarity-pill rarity-${rarity}">${rarityLabel(entry.rarity)}</span>`;
+        const captionHtml = custom.caption ? `<p class="gallery-slot-caption">${escapeHtml(custom.caption)}</p>` : "";
+
         return `
-          <article class="gallery-slot rarity-${rarity}">
+          <article class="gallery-slot rarity-${rarity}"${styleAttr}>
+            ${stickerHtml}
+            <div class="gallery-slot-badge-wrap">${badgeHtml}</div>
             <img src="${entry.image || fallbackImage}" alt="${entry.name}">
-            <div class="slot-title">${entry.name}</div>
+            <div class="slot-title"${titleStyle}>${escapeHtml(entry.name)}</div>
+            ${captionHtml}
             <div class="slot-value">${formatBC(entry.value)}</div>
             <div class="slot-actions">
               <button class="btn btn-ghost" data-remove-entry="${entry.id}" type="button">Снять</button>
@@ -2255,14 +2307,29 @@ function renderMainApp() {
     if (!entry) { showToast("Лот не найден"); return; }
     customizeEntryId = entryId;
     renderCustomizeModal(entry, player);
+    customizeModal.inert = false;
     customizeModal.classList.add("open");
     customizeModal.setAttribute("aria-hidden", "false");
+    if (closeCustomizeModalBtn) closeCustomizeModalBtn.focus();
   }
 
   function closeCustomizeModal() {
     if (!customizeModal) return;
+    const activeInside = document.activeElement && customizeModal.contains(document.activeElement);
+    if (activeInside) {
+      if (openGalleryModalBtn) {
+        openGalleryModalBtn.focus();
+      } else {
+        const body = document.body;
+        const prevTabIndex = body.getAttribute('tabindex');
+        if (!body.hasAttribute('tabindex')) body.setAttribute('tabindex', '-1');
+        body.focus();
+        if (prevTabIndex === null) body.removeAttribute('tabindex');
+      }
+    }
     customizeModal.classList.remove("open");
     customizeModal.setAttribute("aria-hidden", "true");
+    customizeModal.inert = true;
     customizeEntryId = null;
   }
 
@@ -5008,6 +5075,8 @@ if (casePriceInput) {
 }
 
 async function bootstrap() {
+  showPageLoader();
+  
   globalState = await fetchStateFromSupabase();
 
   if (typeof window.Telegram !== 'undefined' && window.Telegram.WebApp) {
@@ -5045,13 +5114,14 @@ async function bootstrap() {
   }
 
   const page = document.body.dataset.page;
-  initPageLoader();
   if (["main", "upgrade", "contract", "gallery", "top", "profile", "donate"].includes(page)) {
     renderMainApp();
   }
   if (page === "admin") {
     renderAdminApp();
   }
+  
+  hidePageLoader();
 }
 
 bootstrap();
