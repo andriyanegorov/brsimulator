@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель | BR Simulator</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+                  /* Центрирование модалки и мультивыбор */
+                  #itemModal {
+                    display: none;
+                    position: fixed;
+                    z-index: 99999;
+                    left: 0; top: 0; width: 100vw; height: 100vh;
+                    background: rgba(0,0,0,0.6);
+                    align-items: center;
+                    justify-content: center;
+                    box-sizing: border-box;
+                    transition: background 0.35s cubic-bezier(.4,0,.2,1);
+                    animation: modalFadeInBg 0.35s cubic-bezier(.4,0,.2,1);
+                  }
+                  #itemModal[style*="display: flex"] {
+                    display: flex !important;
+                  }
+                  @keyframes modalFadeInBg {
+                    from { background: rgba(0,0,0,0); }
+                    to   { background: rgba(0,0,0,0.6); }
+                  }
+                  .modal-content {
+                    background: #181922;
+                    border-radius: 18px;
+                    padding: 32px 24px 24px 24px;
+                    max-width: 600px;
+                    width: 45vw;
+                    max-height: 50vh;
+                    box-shadow: 0 8px 40px #000a;
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: stretch;
+                    opacity: 0;
+                    transform: scale(0.97) translateY(30px);
+                    transition: opacity 0.35s cubic-bezier(.4,0,.2,1), transform 0.35s cubic-bezier(.4,0,.2,1);
+                    animation: modalFadeInContent 0.35s cubic-bezier(.4,0,.2,1) forwards;
+                  }
+                  #itemModal[style*="display: flex"] .modal-content {
+                    opacity: 1;
+                    transform: scale(1) translateY(0);
+                  }
+                  @keyframes modalFadeInContent {
+                    from { opacity: 0; transform: scale(0.97) translateY(30px); }
+                    to   { opacity: 1; transform: scale(1) translateY(0); }
+                  }
+                  .item-card-modal.selected {
+                    border-color: #ffe066;
+                    box-shadow: 0 0 0 4px #ffe066, 0 8px 32px #ffe06644, 0 4px 24px #000b;
+                    background: linear-gradient(135deg, #fffbe6 0%, #ffe066 100%);
+                    color: #222;
+                    position: relative;
+                    transition: box-shadow 0.25s, background 0.25s, color 0.25s, border-color 0.25s;
+                  }
+                  .item-card-modal.selected .item-title,
+                  .item-card-modal.selected div,
+                  .item-card-modal.selected span {
+                    color: #222;
+                    text-shadow: none;
+                  }
+                  .item-card-modal .selected-check {
+                    display: none;
+                  }
+                  .item-card-modal.selected .selected-check {
+                    display: flex;
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    width: 32px;
+                    height: 32px;
+                    background: #ffe066;
+                    border-radius: 50%;
+                    box-shadow: 0 2px 8px #ffe06688;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 3;
+                    animation: fadeInCheck .25s;
+                  }
+                  @keyframes fadeInCheck {
+                    from { opacity: 0; transform: scale(0.7); }
+                    to   { opacity: 1; transform: scale(1); }
+                  }
+                  }
+                  .item-modal-toolbar {
+                    /* ...существующие стили... */
+                    position: sticky;
+                    top: 0;
+                    z-index: 2;
+                    box-shadow: 0 2px 12px #0002;
+                    background: #23243a;
+                    border-radius: 14px;
+                    padding: 16px 18px;
+                    margin-bottom: 18px;
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 14px 18px;
+                  }
+                  #addSelectedItemsBtn {
+                    background: var(--primary);
+                    color: #000;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 10px 18px;
+                    font-weight: 700;
+                    font-size: 15px;
+                    cursor: pointer;
+                    margin-left: auto;
+                    transition: background 0.2s;
+                  }
+                  #addSelectedItemsBtn:disabled {
+                    background: #888;
+                    color: #fff;
+                    cursor: not-allowed;
+                  }
+              /* Модалка выбора предмета — фиксированная панель сортировки, поиск, центрирование */
+              #itemModal {
+                display: none;
+                position: fixed;
+                z-index: 99999;
+                left: 0; top: 0; width: 100vw; height: 100vh;
+                background: rgba(0,0,0,0.6);
+                align-items: center; justify-content: center;
+                transition: background 0.35s cubic-bezier(.4,0,.2,1);
+                animation: modalFadeInBg 0.35s cubic-bezier(.4,0,.2,1);
+              }
+              #itemModal[style*="display: flex"] {
+                display: flex !important;
+              }
+              .modal-content {
+                background: #181922;
+                border-radius: 18px;
+                padding: 32px 24px 24px 24px;
+                max-width: 900px;
+                width: 95vw;
+                max-height: 90vh;
+                box-shadow: 0 8px 40px #000a;
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                opacity: 0;
+                transform: scale(0.97) translateY(30px);
+                transition: opacity 0.35s cubic-bezier(.4,0,.2,1), transform 0.35s cubic-bezier(.4,0,.2,1);
+                animation: modalFadeInContent 0.35s cubic-bezier(.4,0,.2,1) forwards;
+              }
+              #itemModal[style*="display: flex"] .modal-content {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+              }
+              .item-modal-toolbar {
+                background: #23243a;
+                border-radius: 14px;
+                padding: 16px 18px;
+                margin-bottom: 18px;
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 14px 18px;
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                box-shadow: 0 2px 12px #0002;
+              }
+              .item-modal-toolbar input[type="text"] {
+                background: #181922;
+                border-radius: 8px;
+                border: 1px solid #333;
+                color: #fff;
+                padding: 8px 14px;
+                font-size: 15px;
+                min-width: 180px;
+                outline: none;
+              }
+              .item-modal-toolbar select {
+                background: #181922;
+                border-radius: 8px;
+                border: 1px solid #333;
+                color: #fff;
+                padding: 8px 14px;
+                font-size: 15px;
+                outline: none;
+              }
+              #itemModalGrid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
+                gap: 18px;
+                overflow-y: auto;
+                padding-bottom: 8px;
+                flex: 1 1 auto;
+                min-height: 200px;
+                max-height: 55vh;
+              }
+          /* Модалка выбора предмета — плавная анимация, центрирование, затемнение */
+          #itemModal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0; top: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6);
+            align-items: center; justify-content: center;
+            transition: background 0.35s cubic-bezier(.4,0,.2,1);
+            animation: modalFadeInBg 0.35s cubic-bezier(.4,0,.2,1);
+          }
+          #itemModal[style*="display: flex"] {
+            display: flex !important;
+          }
+          @keyframes modalFadeInBg {
+            from { background: rgba(0,0,0,0); }
+            to   { background: rgba(0,0,0,0.6); }
+          }
+          .modal-content {
+            background: #181922;
+            border-radius: 18px;
+            padding: 32px 24px;
+            max-width: 900px;
+            width: 90vw;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 40px #000a;
+            position: relative;
+            opacity: 0;
+            transform: scale(0.97) translateY(30px);
+            transition: opacity 0.35s cubic-bezier(.4,0,.2,1), transform 0.35s cubic-bezier(.4,0,.2,1);
+            animation: modalFadeInContent 0.35s cubic-bezier(.4,0,.2,1) forwards;
+          }
+          #itemModal[style*="display: flex"] .modal-content {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+          @keyframes modalFadeInContent {
+            from { opacity: 0; transform: scale(0.97) translateY(30px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+          }
+          .item-card-modal {
+            transition: box-shadow 0.35s cubic-bezier(.4,0,.2,1), transform 0.35s cubic-bezier(.4,0,.2,1);
+          }
+          .item-card-modal:hover {
+            box-shadow: 0 4px 24px #000b, 0 0 0 2px var(--primary);
+            transform: translateY(-2px) scale(1.03);
+            z-index: 2;
+          }
+      /* Рамки по редкости для карточек выбора предмета */
+      .item-card-modal.rarity-common { border-color: #aaa !important; }
+      .item-card-modal.rarity-rare { border-color: #2ecc71 !important; }
+      .item-card-modal.rarity-epic { border-color: #3498db !important; }
+      .item-card-modal.rarity-legendary { border-color: #9b59b6 !important; }
+      .item-card-modal.rarity-secret { border-color: #f1c40f !important; }
+      .item-card-modal:hover { box-shadow: 0 4px 24px #000b, 0 0 0 2px var(--primary); transform: translateY(-2px) scale(1.03); transition: box-shadow .2s, transform .2s; z-index:2; }
+    :root {
+      --bg-dark: #0f1015;
+      --bg-panel: #1a1b23;
+      --bg-card: #252631;
+      --primary: #ffcc00;
+      --primary-hover: #ffb800;
+      --danger: #ff4757;
+      --danger-hover: #ff2a3d;
+      --text-main: #f1f1f2;
+      --text-muted: #8b8d98;
+      --border: rgba(255, 255, 255, 0.05);
+      --shadow: 0 8px 30px rgba(0,0,0,0.4);
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --btn-font: 'Russo One', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { overflow-x: hidden; }
+    body { background-color: var(--bg-dark); color: var(--text-main); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; overflow: hidden !important; width: 100vw; position: fixed; left: 0; right: 0; }
+
+    /* Toast Notification from style.css (if missing) */
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: #ffcc00; color: #000; padding: 12px 24px; border-radius: 30px; font-weight: bold; font-size: 14px; opacity: 0; transition: all 0.3s ease; z-index: 9999; box-shadow: 0 4px 15px rgba(255,204,0,0.3); }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Layout */
+    .sidebar { width: 260px; background: var(--bg-panel); display: flex; flex-direction: column; border-right: 1px solid var(--border); transition: 0.3s; z-index: 10; }
+    .main-content { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+    /* Sidebar Components */
+    .brand { padding: 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); font-size: 20px; font-weight: 800; color: #fff; letter-spacing: 0.5px; }
+    .brand i { color: var(--primary); font-size: 24px; }
+    
+    .nav-menu { padding: 20px 10px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
+    .nav-link { background: transparent; border: none; color: var(--text-muted); padding: 14px 16px; border-radius: var(--radius-md); font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s ease; text-align: left; }
+    .nav-link:hover { background: rgba(255,204,0,0.05); color: var(--primary); }
+    .nav-link.active { background: var(--primary); color: #000; box-shadow: 0 4px 10px rgba(255,204,0,0.2); }
+    
+    .sidebar-footer { padding: 20px; border-top: 1px solid var(--border); }
+    .btn-exit { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px; background: rgba(255,255,255,0.05); color: #fff; text-decoration: none; border-radius: var(--radius-md); font-weight: 600; transition: 0.2s; }
+    .btn-exit:hover { background: rgba(255,255,255,0.1); color: var(--danger); }
+
+    /* Header */
+    .header { padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; background: rgba(26, 27, 35, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .header h2 { font-size: 22px; font-weight: 700; margin: 0; }
+    .header-icons { display: flex; gap: 15px; color: var(--text-muted); font-size: 18px; }
+
+    /* View Container */
+    .views-container { flex: 1; overflow-y: auto; padding: 30px; }
+    .view-section { display: none; animation: fadeIn 0.4s ease forwards; }
+    .view-section.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Typography & Grid */
+    h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #fff; display: flex; align-items: center; gap: 10px; }
+    h3 i { color: var(--primary); font-size: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .sidebar { width: 70px; } .nav-link span, .brand span { display: none; } .brand { justify-content: center; } .nav-link { justify-content: center; padding: 14px 0; } }
+
+    /* Cards */
+    .card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+    
+    /* Forms & Inputs */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input, select, textarea { width: 100%; background: #14151b; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px 16px; border-radius: var(--radius-md); font-family: inherit; font-size: 14px; transition: 0.3s; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,204,0,0.1); }
+    
+    /* Buttons */
+    .btn {
+      font-family: var(--btn-font, 'Russo One', sans-serif);
+      font-size: 12px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      font-weight: 800;
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      color: #f2f5ff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+      text-decoration: none;
+    }
+    .btn:hover {
+      border-color: rgba(95,255,216,0.45);
+      background: linear-gradient(120deg, rgba(95,255,216,0.08), rgba(0,198,255,0.08));
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+    }
+    .btn-primary {
+      background: linear-gradient(125deg, rgba(95,255,216,0.35), rgba(0,198,255,0.5));
+      border-color: rgba(95,255,216,0.85);
+      color: #03131c;
+      box-shadow: 0 20px 36px rgba(0,198,255,0.35);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(125deg, rgba(95,255,216,0.45), rgba(0,198,255,0.62));
+    }
+    .btn-outline {
+      background: transparent;
+      border-color: rgba(255,255,255,0.25);
+      color: #f5f7ff;
+      box-shadow: none;
+    }
+    .btn-outline:hover {
+      background: rgba(95,255,216,0.08);
+      border-color: rgba(95,255,216,0.5);
+    }
+    .btn-danger {
+      background: linear-gradient(125deg, rgba(255,118,118,0.95), rgba(214,48,49,0.95));
+      border-color: rgba(255,118,118,0.7);
+      color: #fff;
+      box-shadow: 0 18px 34px rgba(214,48,49,0.4);
+    }
+    .btn-danger:hover {
+      background: linear-gradient(125deg, rgba(255,145,145,1), rgba(214,48,49,1));
+    }
+    .btn-block { width: 100%; }
+    .btn-grow { flex: 1 1 auto; }
+    .btn-grow-2 { flex: 2 1 auto; }
+    .btn-compact { padding: 10px 14px; font-size: 11px; letter-spacing: 0.5px; }
+    .btn-sm { padding: 8px 10px; font-size: 10px; letter-spacing: 0.4px; }
+
+    /* Lists */
+    .list-container { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 5px; }
+    .list-container::-webkit-scrollbar { width: 6px; }
+    .list-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    
+    .admin-list-item { background: #1a1b23; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 12px; transition: 0.2s; border-left: 4px solid var(--primary); }
+    .admin-list-item:hover { background: #1e1f29; border-left-color: #fff; }
+    .item-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .item-title { font-weight: 700; font-size: 15px; color: #fff; }
+    .item-subtitle { font-size: 12px; color: var(--text-muted); }
+    .item-price { color: var(--primary); font-weight: 700; background: rgba(255,204,0,0.1); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .item-actions { display: flex; gap: 8px; width: 100%; margin-top: 5px; }
+
+    .mini-card { background: #14151b; border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; }
+    .draft-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+
+    /* Badge icons in admin panel */
+    .player-badge { display: inline-flex; align-items: center; justify-content: center; width: 16px !important; height: 16px !important; max-width: 16px; max-height: 16px; overflow: hidden; flex-shrink: 0; border-radius: 4px; vertical-align: middle; cursor: default; }
+    .player-badge svg { width: 16px !important; height: 16px !important; display: block; }
+    .badge-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .badge-toggle-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a0b4cc; cursor: pointer; padding: 4px 9px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.03); }
+    .badge-toggle-label input { cursor: pointer; accent-color: #ffcc00; flex-shrink: 0; width: auto !important; height: auto !important; padding: 0 !important; border: none !important; background: none !important; box-shadow: none !important; }
+  </style>
+</head>
+<body data-page="admin">
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast" class="toast"></div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <i class="fa-solid fa-crown"></i>
+      <span>BR Admin</span>
+    </div>
+    <div class="nav-menu">
+      <button class="nav-link active" data-target="v-dashboard">
+        <i class="fa-solid fa-chart-pie"></i> <span>Сводка</span>
+      </button>
+      <button class="nav-link" data-target="v-settings">
+        <i class="fa-solid fa-sliders"></i> <span>Сервер</span>
+      </button>
+      <button class="nav-link" data-target="v-cases">
+        <i class="fa-solid fa-box-open"></i> <span>Кейсы</span>
+      </button>
+      <button class="nav-link" data-target="v-players">
+        <i class="fa-solid fa-users"></i> <span>Игроки</span>
+      </button>
+      <button class="nav-link" data-target="v-news">
+        <i class="fa-solid fa-newspaper"></i> <span>Новости</span>
+      </button>
+      <button class="nav-link" data-target="v-promos">
+        <i class="fa-solid fa-ticket"></i> <span>Промокоды</span>
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <a href="index.html" class="btn-exit">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i> <span>В игру</span>
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="header">
+      <h2 id="pageTitle"><i class="fa-solid fa-chart-pie"></i> Сводка</h2>
+      <div class="header-icons">
+        <i class="fa-solid fa-bell"></i>
+        <i class="fa-solid fa-circle-user"></i>
+      </div>
+    </header>
+
+    <div class="views-container">
+      
+      <!-- DASHBOARD (NEW) -->
+      <div id="v-dashboard" class="view-section active">
+        <div class="grid">
+          <div class="card" style="background: linear-gradient(135deg, rgba(255,204,0,0.1) 0%, rgba(20,21,27,1) 100%);">
+            <h3><i class="fa-solid fa-bolt"></i> Добро пожаловать</h3>
+            <p style="color: var(--text-muted); line-height: 1.6;">Это новая профессиональная панель управления вашим проектом. Все изменения применяются в реальном времени и сохраняются в Supabase.</p>
+          </div>
+          <div class="card">
+            <h3><i class="fa-solid fa-server"></i> Статус Системы</h3>
+            <div style="display: flex; gap: 20px; align-items: center; margin-top: 10px;">
+              <div style="width: 12px; height: 12px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 10px #2ecc71;"></div>
+              <span style="font-weight: 600; color: #fff;">Все системы работают стабильно</span>
+            </div>
+          </div>
+        </div>
+        <div id="dashboardStats" class="grid" style="margin-top: 20px;"></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="v-settings" class="view-section">
+        <div class="grid">
+          <div class="card">
+            <h3><i class="fa-solid fa-percent"></i> Экономика (Шансы выпадения)</h3>
+            <form id="rarityForm">
+              <div id="rarityInputs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;"></div>
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Сохранить настройки</button>
+            </form>
+          </div>
+          <div class="card" style="border-color: rgba(255, 71, 87, 0.3);">
+            <h3 style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Опасная зона</h3>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">Сброс топа обнуляет инвентарь и баланс всех игроков (счёт становится 0).</p>
+            <button id="resetTopBtn" class="btn btn-danger" style="margin-bottom: 16px;"><i class="fa-solid fa-trophy"></i> Сбросить топ</button>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">Сброс базы данных вернет проект к стартовым настройкам. Это действие необратимо.</p>
+            <button id="resetDbBtn" class="btn btn-danger"><i class="fa-solid fa-skull"></i> Полный сброс (Wipe)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CASES -->
+      <div id="v-cases" class="view-section">
+        <div class="grid">
+          <!-- КАТЕГОРИИ КЕЙСОВ -->
+          <div class="card" style="grid-column: 1 / -1;">
+            <h3><i class="fa-solid fa-tags"></i> Категории кейсов</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+              <input type="text" id="categoryName" placeholder="Например: Премиум кейсы" style="flex: 1;">
+              <input type="text" id="categoryDescription" placeholder="Описание категории" style="flex: 1;">
+              <button type="button" id="addCategoryBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Добавить категорию</button>
+            </div>
+            <div id="categoriesList" class="list-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;"></div>
+          </div>
+
+          <!-- КОНСТРУКТОР КЕЙСА -->
+          <div class="card">
+            <h3><i class="fa-solid fa-plus"></i> Конструктор кейса</h3>
+            <form id="caseForm">
+              <input type="hidden" id="caseId">
+              <div class="form-group">
+                <label>Название кейса</label>
+                <input type="text" id="caseName" placeholder="Например: Люкс Кейс" required>
+              </div>
+              <div class="form-group">
+                <label>Категория</label>
+                <select id="caseCategory" required>
+                  <option value="">Выберите категорию</option>
+                </select>
+              </div>
+              <div class="form-group" style="display:flex; gap:15px;">
+                <div style="flex:1;">
+                  <label>Цена открытия (BC)</label>
+                  <input type="number" id="casePrice" placeholder="500" required>
+                </div>
+                <div style="flex:1;">
+                  <label>URL Картинки</label>
+                  <input type="text" id="caseImage" placeholder="img/case.png">
+                </div>
+              </div>
+              
+              <div class="mini-card">
+                <h4 style="font-size: 14px; color: #fff; margin-bottom: 12px;"><i class="fa-solid fa-gem" style="color:var(--primary);"></i> Добавление предмета</h4>
+                <div class="form-group">
+                  <button type="button" id="openItemModalBtn" class="btn btn-primary btn-block" style="margin-bottom:12px;"><i class="fa-solid fa-magnifying-glass"></i> Выбрать предмет</button>
+                  <input type="text" id="itemName" placeholder="Название (напр. BMW M5)" style="margin-bottom: 10px;">
+                  <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select id="itemRarity" style="flex:1;">
+                      <option value="common">Серый</option>
+                      <option value="rare">Зеленый</option>
+                      <option value="epic">Синий</option>
+                      <option value="legendary">Фиолетовый</option>
+                      <option value="secret">Золотой</option>
+                    </select>
+                    <input type="number" id="itemValue" placeholder="Цена продажи (BC)" style="flex:1;">
+                  </div>
+                  <input type="text" id="itemImage" placeholder="img/item.png" style="margin-bottom: 15px;">
+                  <button type="button" id="addItemBtn" class="btn btn-outline btn-block"><i class="fa-solid fa-plus"></i> Вложить предмет</button>
+                </div>
+                <div id="caseItemsList" class="list-container" style="max-height: 150px;"></div>
+                <div id="caseStatsInfo" class="case-stats-info" style="margin-top:12px;"></div>
+
+                <!-- Модалка выбора предмета -->
+                <div id="itemModal" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); align-items:center; justify-content:center;">
+                  <div class="modal-content">
+                    <button id="closeItemModalBtn" style="position:absolute; top:18px; right:18px; background:none; border:none; color:#fff; font-size:22px; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="item-modal-toolbar">
+                      <input type="text" id="itemModalSearch" placeholder="Поиск по названию...">
+                      <select id="itemModalSort">
+                        <option value="name">Сортировать: Название</option>
+                        <option value="value">Сортировать: Цена</option>
+                        <option value="rarity">Сортировать: Редкость</option>
+                        <option value="type">Сортировать: Тип</option>
+                        <option value="country">Сортировать: Страна</option>
+                      </select>
+                      <select id="itemModalRarityFilter">
+                        <option value="">Все редкости</option>
+                        <option value="gray">Серый</option>
+                        <option value="green">Зеленый</option>
+                        <option value="blue">Синий</option>
+                        <option value="purple">Фиолетовый</option>
+                        <option value="gold">Золотой</option>
+                      </select>
+                      <select id="itemModalCountryFilter">
+                        <option value="">Все страны</option>
+                        <option value="Россия">Россия</option>
+                        <option value="СССР">СССР</option>
+                        <option value="Германия">Германия</option>
+                        <option value="Япония">Япония</option>
+                        <option value="Италия">Италия</option>
+                        <option value="США">США</option>
+                        <option value="Китай">Китай</option>
+                        <option value="Франция">Франция</option>
+                        <option value="Великобритания">Великобритания</option>
+                        <option value="Швеция">Швеция</option>
+                        <option value="Южная Корея">Южная Корея</option>
+                      </select>
+                      <button id="addSelectedItemsBtn" disabled>Добавить выбранные</button>
+                    </div>
+                    <div id="itemModalGrid"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary btn-grow-2"><i class="fa-solid fa-check"></i> Сохранить кейс</button>
+                <button type="button" id="clearCaseDraftBtn" class="btn btn-outline btn-grow"><i class="fa-solid fa-eraser"></i> Очистить</button>
+              </div>
+            </form>
+          </div>
+          
+          <div class="card">
+            <h3><i class="fa-solid fa-boxes-stacked"></i> База кейсов</h3>
+            <div id="caseList" class="list-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLAYERS -->
+      <div id="v-players" class="view-section">
+        <div class="grid">
+          <div class="card" style="align-self: start;">
+            <h3><i class="fa-solid fa-user-plus"></i> Добавить игрока</h3>
+            <form id="addPlayerForm">
+              <div class="form-group">
+                <label>Никнейм</label>
+                <input type="text" name="nick" placeholder="Ivan_Ivanov" required>
+              </div>
+              <div class="form-group">
+                <label>Сервер</label>
+                <input type="text" name="server" placeholder="Moscow" required>
+              </div>
+              <div class="form-group">
+                <label>Баланс (BC)</label>
+                <input type="number" name="balance" value="0">
+              </div>
+              <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-user-check"></i> Зарегистрировать</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3><i class="fa-solid fa-users-gear"></i> Управление базой</h3>
+            <div id="playerList" class="list-container" style="max-height: 600px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEWS -->
+      <div id="v-news" class="view-section">
+        <div class="grid">
+          <div class="card" style="align-self: start;">
+            <h3><i class="fa-solid fa-pen-nib"></i> Публикация</h3>
+            <form id="newsForm">
+              <div class="form-group">
+                <label>Текст новости</label>
+                <textarea id="newsText" rows="6" placeholder="Введите текст анонса..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-paper-plane"></i> Опубликовать</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3><i class="fa-solid fa-list-ul"></i> Лента новостей</h3>
+            <div id="adminNewsList" class="list-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROMOS -->
+      <div id="v-promos" class="view-section">
+        <div class="grid">
+          <div class="card" style="align-self: start;">
+            <h3><i class="fa-solid fa-ticket"></i> Создать промокод</h3>
+            <form id="promoForm">
+              <div class="form-group">
+                <label>Промокод (код)</label>
+                <input type="text" id="promoCodeInput" placeholder="Например: FREE100" required>
+              </div>
+              <div class="form-group">
+                <label>Награда (BC)</label>
+                <input type="number" id="promoRewardInput" placeholder="1000" min="1" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-plus"></i> Создать</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3><i class="fa-solid fa-list"></i> Активные промокоды</h3>
+            <div id="adminPromoList" class="list-container"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const tabs = document.querySelectorAll(".nav-link");
+      const views = document.querySelectorAll(".view-section");
+      const title = document.getElementById("pageTitle");
+      
+      tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          tabs.forEach(t => t.classList.remove("active"));
+          views.forEach(v => v.classList.remove("active"));
+          
+          tab.classList.add("active");
+          document.getElementById(tab.dataset.target).classList.add("active");
+          title.innerHTML = tab.innerHTML; // Copy icon and text
+        });
+      });
+    });
+  </script>
+</body>
+</html>

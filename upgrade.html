@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Black Russia Cases — Апгрейд</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-page="upgrade" class="page-loading">
+    <div id="pageLoader" class="page-loader hidden">
+      <div class="spinner"></div>
+      <div class="loader-text">Загрузка раздела...</div>
+    </div>
+    <div class="app-bg"></div>
+    <div class="app-shell">
+      <div class="island-wrap">
+        <div class="island" id="mainIsland">
+          <div class="island-default" id="islandDefault">
+            <div class="island-logo">
+              <div class="island-logo-icon">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="32" height="32" rx="10" fill="url(#logo_g2)"/>
+                  <path d="M8 24V8h7.5c2 0 3.4.4 4.3 1.2.9.8 1.3 1.9 1.3 3.2 0 .9-.2 1.6-.7 2.2-.4.6-1 1-1.8 1.3 1 .2 1.8.7 2.4 1.4.6.7.9 1.7.9 2.8 0 1.5-.5 2.7-1.4 3.6C19.5 23.6 18 24 16 24H8zm3.2-9.5h3.7c1 0 1.7-.2 2.2-.7.5-.4.7-1 .7-1.8 0-.7-.2-1.3-.7-1.7-.5-.4-1.2-.6-2.2-.6h-3.7v4.8zm0 7h4.1c1.1 0 1.9-.2 2.4-.7s.8-1.2.8-2c0-.9-.3-1.6-.8-2.1-.5-.5-1.3-.7-2.4-.7h-4.1V21.5z" fill="white"/>
+                  <defs><linearGradient id="logo_g2" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#cc0000"/><stop offset="100%" stop-color="#7b0000"/></linearGradient></defs>
+                </svg>
+              </div>
+              <div class="island-title-wrap">
+                <span class="island-title">BLACK RUSSIA</span>
+                <span class="island-sub">SIMULATOR</span>
+              </div>
+            </div>
+            <div class="island-balance" id="balanceCard">
+              <img src="img/symbols/bc.png" alt="BC" class="bc-icon">
+              <strong id="balanceValue">0</strong>
+            </div>
+          </div>
+          <div class="island-live" id="islandLive">
+            <div class="ldb-badge"><span class="ldb-dot"></span>LIVE</div>
+            <div class="ldb-track-wrap">
+              <div class="ldb-track" id="ldbTrack"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <main class="content">
+        <section class="view active" data-view="upgrade">
+          <div class="upg2-page">
+            <h2 class="upg2-main-title">⚡ МОДЕРНИЗАЦИЯ 2.0</h2>
+            <div class="upg2-arena">
+              <div class="upg2-side upg2-left">
+                <div class="upg2-side-label">Выберите предмет (1)</div>
+                <div class="upg2-slots" id="labUpgradeSlots"></div>
+                <div class="upg2-side-sum">Сумма: <strong id="upgSumValue">0 BC</strong></div>
+              </div>
+              <div class="upg2-center">
+                <div class="upg2-circle-wrap" id="upgradeChanceRing">
+                  <div class="upg2-circle-outer">
+                    <svg viewBox="0 0 200 200" class="upg2-ring-svg">
+                      <defs>
+                        <linearGradient id="upgGrad2" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stop-color="#00e5ff"/>
+                          <stop offset="100%" stop-color="#76ff03"/>
+                        </linearGradient>
+                      </defs>
+                      <circle cx="100" cy="100" r="90" class="upg2-ring-bg"/>
+                      <circle cx="100" cy="100" r="90" class="upg2-ring-fill" id="upgradeRingFill"/>
+                    </svg>
+                    <div class="upg2-ring-label">
+                      <span class="upg2-ring-pct" id="upgradeChancePct">0%</span>
+                      <span class="upg2-ring-sub">ШАНС УСПЕХА</span>
+                    </div>
+                    <div class="upg2-circle-pointer" id="upgPointer"></div>
+                  </div>
+                </div>
+                <div class="upg2-balance-card">
+                  <div class="upg2-balance-top">
+                    <span class="upg2-balance-label">Доплата для шанса</span>
+                    <span class="upg2-balance-wallet">Баланс: <strong id="upgBalanceAvailable">0</strong> BC</span>
+                  </div>
+                  <input class="upg2-balance-range" type="range" id="upgBalanceSlider" min="0" max="0" value="0">
+                  <div class="upg2-balance-bottom">
+                    <span>Добавляете к ставке</span>
+                    <strong>+<span id="upgBalanceAdd">0</span> BC</strong>
+                  </div>
+                </div>
+                <button class="upg2-launch-btn" id="launchUpgradeBtn" type="button" disabled>
+                  <span class="upg2-launch-spark"></span>
+                  ПРОКАЧАТЬ
+                </button>
+              </div>
+              <div class="upg2-side upg2-right">
+                <div class="upg2-side-label">Желаемый предмет</div>
+                <div class="upg2-target-box" id="upgTargetBox">
+                  <div class="upg2-target-empty" id="upgTargetEmpty">
+                    <span class="upg2-target-plus">+</span>
+                    <span>Выбрать цель</span>
+                  </div>
+                  <div class="upg2-target-filled" id="upgTargetFilled" style="display:none;">
+                    <button class="upg2-target-remove" id="upgTargetRemove" type="button">✕</button>
+                    <img id="upgTargetImg" src="" alt="">
+                    <span class="upg2-target-name" id="upgTargetName"></span>
+                    <span class="upg2-target-val" id="upgTargetVal"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <section class="upg2-inv-section">
+              <div class="upg2-inv-header">
+                <h3 class="upg2-inv-title">Мои предметы</h3>
+                <div class="upg2-inv-filters">
+                  <input type="text" class="upg2-search" id="upgInvSearch" placeholder="Поиск...">
+                  <select class="upg2-sort" id="upgInvSort">
+                    <option value="value-desc">Дорогие</option>
+                    <option value="value-asc">Дешёвые</option>
+                    <option value="name">По имени</option>
+                  </select>
+                </div>
+              </div>
+              <div class="upg2-inventory" id="labUpgradeInventory"></div>
+            </section>
+            <div class="upg2-target-modal" id="upgTargetSection" style="display:none;">
+              <div class="upg2-target-modal-content">
+                <div class="upg2-target-modal-header">
+                  <h3 class="upg2-target-modal-title">Выберите желаемый предмет</h3>
+                  <button class="upg2-target-modal-close" id="upgCloseTarget" type="button">✕</button>
+                </div>
+                <div class="upg2-target-modal-toolbar">
+                  <input type="text" class="upg2-search" id="upgTargetSearch" placeholder="Поиск предмета...">
+                  <select class="upg2-sort" id="upgTargetSort">
+                    <option value="value-desc">Дорогие</option>
+                    <option value="value-asc">Дешёвые</option>
+                    <option value="name">По имени</option>
+                  </select>
+                  <select class="upg2-sort" id="upgTargetRarity">
+                    <option value="">Все предметы</option>
+                    <option value="car">Машины</option>
+                    <option value="skin">Скины</option>
+                    <option value="acc">Аксессуары</option>
+                  </select>
+                </div>
+                <div class="upg2-target-modal-body">
+                  <div class="upg2-target-grid" id="upgTargetGrid"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <nav class="bottom-nav glass beautiful-nav" id="bottomNav">
+        <a class="nav-btn" href="index.html" data-target="home">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Главное</span>
+        </a>
+        <a class="nav-btn active" href="upgrade.html" data-target="upgrade">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-text">Апгрейд</span>
+        </a>
+        <a class="nav-btn" href="contract.html" data-target="contract">
+          <span class="nav-icon">📜</span>
+          <span class="nav-text">Контракт</span>
+        </a>
+        <a class="nav-btn" href="profile.html" data-target="profile">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">Профиль</span>
+        </a>
+        <button class="nav-btn nav-btn-more" id="moreNavBtn" type="button" aria-expanded="false" aria-controls="moreNavMenu">
+          <span class="nav-icon">☰</span>
+          <span class="nav-text">Еще</span>
+        </button>
+      </nav>
+      <div class="more-nav-menu" id="moreNavMenu" aria-hidden="true">
+        <a class="more-nav-item" href="gallery.html" data-target="gallery">🖼️ Выставка</a>
+        <a class="more-nav-item" href="top.html" data-target="top">🏆 Топ игроков</a>
+        <a class="more-nav-item" href="donate.html" data-target="donate">💎 Донат</a>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

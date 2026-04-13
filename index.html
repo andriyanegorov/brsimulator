@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Black Russia Cases</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-page="main" class="page-loading">
+    <div id="pageLoader" class="page-loader hidden">
+      <div class="spinner"></div>
+      <div class="loader-text">Загрузка раздела...</div>
+    </div>
+    <div class="app-bg"></div>
+    <div class="app-shell">
+      <div class="island-wrap">
+        <div class="island" id="mainIsland">
+          <div class="island-default" id="islandDefault">
+            <div class="island-logo">
+              <div class="island-logo-icon">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="32" height="32" rx="10" fill="url(#logo_g2)"/>
+                  <path d="M8 24V8h7.5c2 0 3.4.4 4.3 1.2.9.8 1.3 1.9 1.3 3.2 0 .9-.2 1.6-.7 2.2-.4.6-1 1-1.8 1.3 1 .2 1.8.7 2.4 1.4.6.7.9 1.7.9 2.8 0 1.5-.5 2.7-1.4 3.6C19.5 23.6 18 24 16 24H8zm3.2-9.5h3.7c1 0 1.7-.2 2.2-.7.5-.4.7-1 .7-1.8 0-.7-.2-1.3-.7-1.7-.5-.4-1.2-.6-2.2-.6h-3.7v4.8zm0 7h4.1c1.1 0 1.9-.2 2.4-.7s.8-1.2.8-2c0-.9-.3-1.6-.8-2.1-.5-.5-1.3-.7-2.4-.7h-4.1V21.5z" fill="white"/>
+                  <defs><linearGradient id="logo_g2" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#cc0000"/><stop offset="100%" stop-color="#7b0000"/></linearGradient></defs>
+                </svg>
+              </div>
+              <div class="island-title-wrap">
+                <span class="island-title">BLACK RUSSIA</span>
+                <span class="island-sub">SIMULATOR</span>
+              </div>
+            </div>
+            <div class="island-balance" id="balanceCard">
+              <img src="img/symbols/bc.png" alt="BC" class="bc-icon">
+              <strong id="balanceValue">0</strong>
+            </div>
+          </div>
+          <div class="island-live" id="islandLive">
+            <div class="ldb-badge"><span class="ldb-dot"></span>LIVE</div>
+            <div class="ldb-track-wrap">
+              <div class="ldb-track" id="ldbTrack"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="bannedBanner" class="banned-banner" aria-live="assertive" aria-hidden="true">
+        <div class="banned-card">
+          <div class="banned-tag">Заблокировано</div>
+          <h2>Ваш аккаунт заблокирован администрацией</h2>
+          <p>Доступ к проекту ограничен. Обратитесь к администрации для разблокировки.</p>
+        </div>
+      </div>
+      <main class="content">
+        <section class="view active" data-view="home">
+          <div class="home-stats-bar">
+            <div class="home-stat">
+              <span class="home-stat-dot pulse-green"></span>
+              <span class="home-stat-label">Онлайн</span>
+              <strong class="home-stat-value" id="statOnline">0</strong>
+            </div>
+            <div class="home-stat-divider"></div>
+            <div class="home-stat">
+              <span class="home-stat-icon">📦</span>
+              <span class="home-stat-label">Кейсов открыто</span>
+              <strong class="home-stat-value" id="statTotalCases">0</strong>
+            </div>
+          </div>
+
+          <section class="block glass rewards-block" id="bonusSection">
+            <div class="block-head">
+              <h3>Бонусы</h3>
+              <small>Бесплатная валюта каждый день</small>
+            </div>
+            <div class="rewards-grid">
+              <div class="reward-card" id="dailyBonusCard"></div>
+              <div class="reward-card" id="wheelTriggerCard"></div>
+            </div>
+          </section>
+
+          <section class="block">
+            <div class="block-head">
+              <h3>Кейсы</h3>
+              <small>Доступные категории</small>
+            </div>
+            <div id="caseCategoriesContainer" class="cases-categories-container"></div>
+          </section>
+
+          <section class="block">
+            <div class="block-head">
+              <h3>Новости</h3>
+              <small>Обновления и события</small>
+            </div>
+            <div class="news-list" id="newsList"></div>
+          </section>
+        </section>
+
+        <section class="view" data-view="case-preview">
+          <div class="case-preview-modal">
+            <button class="btn btn-ghost" id="backToHomeBtn" type="button">&larr; Закрыть</button>
+            <section class="block">
+              <div class="case-open-panel">
+                <img id="previewCaseImg" src="" alt="">
+                <h2 id="previewCaseName">Case</h2>
+              <div class="open-controls">
+                <div class="open-mode-row">
+                  <button class="open-mode-btn active" data-open-mode="classic" type="button">
+                    <span class="btn-title">Открыть</span>
+                    <span class="btn-price" data-open-price>0 BC</span>
+                  </button>
+                  <button class="open-mode-btn" data-open-mode="quick" type="button">
+                    <span class="btn-title">Открыть быстро</span>
+                    <span class="btn-price" data-open-price>0 BC</span>
+                  </button>
+                </div>
+                <div class="open-multiplier" id="openMultiplierGroup">
+                  <button class="chip active" data-open-multiplier="1" type="button">x1</button>
+                  <button class="chip" data-open-multiplier="2" type="button">x2</button>
+                  <button class="chip" data-open-multiplier="5" type="button">x5</button>
+                  <button class="chip" data-open-multiplier="10" type="button">x10</button>
+                </div>
+                <div class="open-cost-line">Итого к списанию: <strong id="openCostValue">0 BC</strong></div>
+              </div>
+              </div>
+            </section>
+          <section class="block">
+            <div class="block-head">
+              <h3>Содержимое</h3>
+            </div>
+            <div id="previewItemList"></div>
+          </section>
+        </div>
+        </section>
+
+        <!-- ===== АПГРЕЙД 2.0 (case-battle style) ===== -->
+        <section class="view" data-view="upgrade">
+          <div class="upg2-page">
+            <h2 class="upg2-main-title">⚡ МОДЕРНИЗАЦИЯ 2.0</h2>
+
+            <div class="upg2-arena">
+              <!-- LEFT: your items -->
+              <div class="upg2-side upg2-left">
+                <div class="upg2-side-label">Выберите предмет (1)</div>
+                <div class="upg2-slots" id="labUpgradeSlots"></div>
+                <div class="upg2-side-sum">Сумма: <strong id="upgSumValue">0 BC</strong></div>
+              </div>
+
+              <!-- CENTER: chance ring -->
+              <div class="upg2-center">
+                <div class="upg2-circle-wrap" id="upgradeChanceRing">
+                  <div class="upg2-circle-outer">
+                    <svg viewBox="0 0 200 200" class="upg2-ring-svg">
+                      <defs>
+                        <linearGradient id="upgGrad2" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stop-color="#00e5ff"/>
+                          <stop offset="100%" stop-color="#76ff03"/>
+                        </linearGradient>
+                      </defs>
+                      <circle cx="100" cy="100" r="90" class="upg2-ring-bg"/>
+                      <circle cx="100" cy="100" r="90" class="upg2-ring-fill" id="upgradeRingFill"/>
+                    </svg>
+                    <div class="upg2-ring-label">
+                      <span class="upg2-ring-pct" id="upgradeChancePct">0%</span>
+                      <span class="upg2-ring-sub">ШАНС УСПЕХА</span>
+                    </div>
+                    <div class="upg2-circle-pointer" id="upgPointer"></div>
+                  </div>
+                </div>
+                <div class="upg2-balance-card">
+                  <div class="upg2-balance-top">
+                    <span class="upg2-balance-label">Доплата для шанса</span>
+                    <span class="upg2-balance-wallet">Баланс: <strong id="upgBalanceAvailable">0</strong> BC</span>
+                  </div>
+                  <input class="upg2-balance-range" type="range" id="upgBalanceSlider" min="0" max="0" value="0">
+                  <div class="upg2-balance-bottom">
+                    <span>Добавляете к ставке</span>
+                    <strong>+<span id="upgBalanceAdd">0</span> BC</strong>
+                  </div>
+                </div>
+                <button class="upg2-launch-btn" id="launchUpgradeBtn" type="button" disabled>
+                  <span class="upg2-launch-spark"></span>
+                  ПРОКАЧАТЬ
+                </button>
+              </div>
+
+              <!-- RIGHT: target item -->
+              <div class="upg2-side upg2-right">
+                <div class="upg2-side-label">Желаемый предмет</div>
+                <div class="upg2-target-box" id="upgTargetBox">
+                  <div class="upg2-target-empty" id="upgTargetEmpty">
+                    <span class="upg2-target-plus">+</span>
+                    <span>Выбрать цель</span>
+                  </div>
+                  <div class="upg2-target-filled" id="upgTargetFilled" style="display:none;">
+                    <button class="upg2-target-remove" id="upgTargetRemove" type="button">✕</button>
+                    <img id="upgTargetImg" src="" alt="">
+                    <span class="upg2-target-name" id="upgTargetName"></span>
+                    <span class="upg2-target-val" id="upgTargetVal"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats row -->
+
+            <!-- Inventory: my items -->
+            <section class="upg2-inv-section">
+              <div class="upg2-inv-header">
+                <h3 class="upg2-inv-title">Мои предметы</h3>
+                <div class="upg2-inv-filters">
+                  <input type="text" class="upg2-search" id="upgInvSearch" placeholder="Поиск...">
+                  <select class="upg2-sort" id="upgInvSort">
+                    <option value="value-desc">Дорогие</option>
+                    <option value="value-asc">Дешёвые</option>
+                    <option value="name">По имени</option>
+                  </select>
+                </div>
+              </div>
+              <div class="upg2-inventory" id="labUpgradeInventory"></div>
+            </section>
+
+            <!-- Target picker modal (full screen) -->
+            <div class="upg2-target-modal" id="upgTargetSection" style="display:none;">
+              <div class="upg2-target-modal-content">
+                <div class="upg2-target-modal-header">
+                  <h3 class="upg2-target-modal-title">Выберите желаемый предмет</h3>
+                  <button class="upg2-target-modal-close" id="upgCloseTarget" type="button">✕</button>
+                </div>
+                <div class="upg2-target-modal-toolbar">
+                  <input type="text" class="upg2-search" id="upgTargetSearch" placeholder="Поиск предмета...">
+                  <select class="upg2-sort" id="upgTargetSort">
+                    <option value="value-desc">Дорогие</option>
+                    <option value="value-asc">Дешёвые</option>
+                    <option value="name">По имени</option>
+                  </select>
+                  <select class="upg2-sort" id="upgTargetRarity">
+                    <option value="">Все предметы</option>
+                    <option value="car">Машины</option>
+                    <option value="skin">Скины</option>
+                    <option value="acc">Аксессуары</option>
+                  </select>
+                </div>
+                <div class="upg2-target-modal-body">
+                  <div class="upg2-target-grid" id="upgTargetGrid"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== КОНТРАКТ 2.0 (case-battle style) ===== -->
+        <section class="view" data-view="contract">
+          <div class="ctr2-page">
+            <h2 class="ctr2-main-title">📜 КОНТРАКТЫ</h2>
+
+            <!-- 10 slots grid -->
+            <div class="ctr2-slots-wrap">
+              <div class="ctr2-slots" id="labContractSlots"></div>
+            </div>
+
+            <!-- Info bar -->
+            <div class="ctr2-info-bar">
+              <div class="ctr2-info-left">
+                <span class="ctr2-counter" id="ctrCounter">Положите ещё минимум <strong>3</strong> предмета</span>
+              </div>
+              <div class="ctr2-info-right">
+                <span>СУММА КОНТРАКТА: <strong id="ctrSumValue">0 BC</strong></span>
+              </div>
+            </div>
+
+            <!-- Result range -->
+            <div class="ctr2-result-bar">
+              <div class="ctr2-range">
+                Вы получите предмет от <strong id="ctrRangeMin">0 BC</strong> до <strong id="ctrRangeMax">0 BC</strong>
+              </div>
+              <div class="ctr2-target-row">
+                <span>Цель:</span>
+                <div class="ctr2-target-chip" id="ctrTargetChip">
+                  <span class="ctr2-target-icon">🎲</span>
+                  <span id="ctrTargetLabel">СЛУЧАЙНАЯ</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sign button -->
+            <button class="ctr2-sign-btn" id="launchContractBtn" type="button" disabled>
+              <span class="ctr2-sign-spark"></span>
+              ПОДПИСАТЬ!
+            </button>
+
+            <!-- My inventory -->
+            <section class="ctr2-inv-section">
+              <div class="ctr2-inv-header">
+                <h3 class="ctr2-inv-title">МОИ ПРЕДМЕТЫ</h3>
+                <div class="ctr2-inv-filters">
+                  <input type="text" class="ctr2-search" id="ctrInvSearch" placeholder="Поиск...">
+                  <select class="ctr2-sort" id="ctrInvSort">
+                    <option value="value-desc">Дорогие</option>
+                    <option value="value-asc">Дешёвые</option>
+                    <option value="name">По имени</option>
+                  </select>
+                </div>
+              </div>
+              <div class="ctr2-inventory" id="labContractInventory"></div>
+            </section>
+          </div>
+        </section>
+
+          <section class="view" data-view="gallery">
+            <section class="block glass gallery-block">
+              <div class="block-head">
+                <h3>Выставка</h3>
+                <div class="gallery-counter" id="galleryMyCount">0/5</div>
+              </div>
+              <p class="gallery-description">Выставляйте лучшие предметы из своего инвентаря (до 5 штук за раз) и собирайте лайки от других игроков. Сняв предмет с витрины, можно освободить слот.</p>
+              <div class="gallery-my-panel">
+                <div class="gallery-slot-grid" id="myGallerySlots"></div>
+                <p class="gallery-hint" id="galleryHint">Добавьте предметы, чтобы показать их всем.</p>
+                <button class="btn btn-primary" id="openGalleryModalBtn" type="button">Выставить предмет</button>
+              </div>
+            </section>
+
+            <section class="block glass">
+              <div class="block-head">
+                <h3>Галерея игроков</h3>
+                <small>Лайкните понравившийся дроп</small>
+              </div>
+              <div class="gallery-feed" id="galleryFeed"></div>
+              <div class="gallery-pagination" id="galleryPagination"></div>
+            </section>
+          </section>
+
+        <section class="view" data-view="top">
+          <section class="block">
+            <div class="block-head">
+              <h3>Топ-Игроков</h3>
+              <small>Обновление в реальном времени</small>
+            </div>
+            <div class="top-list" id="topList"></div>
+            <div class="top-my-rank" id="topMyRank" style="display:none;"></div>
+            
+            <div style="margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1); color: #a4a5a6; font-size: 12px; line-height: 1.5; text-align: center;">
+              <strong>ℹ️ Важно:</strong><br>
+              Призы за Топ-3 выдаются в конце сезона. С победителями свяжутся администраторы проекта в игре или через привязанные соцсети. Следите за новостями!
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="profile">
+          <section class="block profile-block glass" style="position: relative; padding: 20px; border-radius: 20px; text-align: left; background: rgba(18, 20, 24, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div style="position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.1); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s;" id="editProfileBtn">
+              <span style="font-size: 16px;">✏️</span>
+            </div>
+            <div class="profile-header" style="display: flex; align-items: center; gap: 15px;">
+              <div id="profileAvatar" style="width: 70px; height: 70px; border-radius: 50%; background: #1e263d url('img/avatar_placeholder.png') center/cover; border: 2px solid #f1c40f;"></div>
+              <div>
+                <h3 id="profileNickDisplay" style="margin: 0; font-size: 20px; font-weight: 800; color: #fff;">User</h3>
+                <p id="profileServerDisplay" style="margin: 4px 0 0; font-size: 14px; color: #a4a5a6;">Black Russia</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="block glass" style="padding: 15px; border-radius: 15px; background: rgba(18, 20, 24, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1);">
+            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 16px; color: #fff;">Статистика профиля</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 10px;">
+                <p style="margin: 0; font-size: 10px; color: #a4a5a6; text-transform: uppercase;">Стоимость <br>инвентаря</p>
+                <strong id="statInvValue" style="font-size: 14px; color: #00e676;">0 BC</strong>
+              </div>
+              <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 10px;">
+                <p style="margin: 0; font-size: 10px; color: #a4a5a6; text-transform: uppercase;">Всего предметов <br>продано</p>
+                <strong id="statItemsSold" style="font-size: 14px; color: #fff;">0</strong>
+              </div>
+              <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 10px;">
+                <p style="margin: 0; font-size: 10px; color: #a4a5a6; text-transform: uppercase;">Заработано <br>с продаж</p>
+                <strong id="statValueSold" style="font-size: 14px; color: #f1c40f;">0 BC</strong>
+              </div>
+              <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 10px;">
+                <p style="margin: 0; font-size: 10px; color: #a4a5a6; text-transform: uppercase;">Любимый <br>кейс</p>
+                <strong id="statFavCase" style="font-size: 14px; color: #3498db;">Нет</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="block glass" style="padding: 15px; border-radius: 15px; background: rgba(18, 20, 24, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1);">
+            <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 16px; color: #fff;">Промокод</h3>
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="promoInput" placeholder="Введите промокод..." style="flex: 1; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 14px;">
+              <button class="btn btn-primary" id="activatePromoBtn" type="button" style="padding: 0 20px; border-radius: 32px;">✔️</button>
+            </div>
+          </section>
+
+          <section class="block">
+            <div class="block-head" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+              <div>
+                <h3>Инвентарь</h3>
+                <small id="inventoryCount">0 предметов</small>
+              </div>
+              <button id="sellAllBtn" class="btn btn-gold" style="padding: 8px 12px; font-size: 12px; opacity: 0.85; border-radius: 32px; background: linear-gradient(135deg, #ff4c4c, #b30000); color: white; transform: none;">Продать всё</button>
+            </div>
+            <div class="inventory-list" id="inventoryList" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
+          </section>
+        </section>
+
+        <section class="view" data-view="donate">
+          <section class="block donate-block glass" style="padding: 25px 20px; border-radius: 20px; background: rgba(18, 20, 24, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+            <div style="font-size: 40px; margin-bottom: 10px;">💎</div>
+            <h3 style="font-size: 24px; color: #fff; margin-bottom: 15px;">Пожертвование</h3>
+            <p style="color: #a4a5a6; font-size: 14px; line-height: 1.5; margin-bottom: 20px;">
+              Поддержка проекта помогает улучшать симулятор, добавлять новые кейсы, события и делать игру стабильнее. Каждая копеечка идет в развитие: дизайн, оптимизация и новый контент!
+            </p>
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed rgba(255,255,255,0.2);">
+              <strong style="color: #f1c40f; font-size: 16px;">Бонус +15% к донату!</strong>
+            </div>
+            <button class="btn btn-gold" id="donateBtn" type="button" style="width: 100%; padding: 15px; font-size: 16px; border-radius: 12px;">Поддержать проект</button>
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-nav glass beautiful-nav" id="bottomNav">
+        <a class="nav-btn active" href="index.html" data-target="home">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Главное</span>
+        </a>
+        <a class="nav-btn" href="upgrade.html" data-target="upgrade">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-text">Апгрейд</span>
+        </a>
+        <a class="nav-btn" href="contract.html" data-target="contract">
+          <span class="nav-icon">📜</span>
+          <span class="nav-text">Контракт</span>
+        </a>
+        <a class="nav-btn" href="profile.html" data-target="profile">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">Профиль</span>
+        </a>
+        <button class="nav-btn nav-btn-more" id="moreNavBtn" type="button" aria-expanded="false" aria-controls="moreNavMenu">
+          <span class="nav-icon">☰</span>
+          <span class="nav-text">Еще</span>
+        </button>
+      </nav>
+      <div class="more-nav-menu" id="moreNavMenu" aria-hidden="true">
+        <a class="more-nav-item" href="gallery.html" data-target="gallery">🖼️ Выставка</a>
+        <a class="more-nav-item" href="top.html" data-target="top">🏆 Топ игроков</a>
+        <a class="more-nav-item" href="donate.html" data-target="donate">💎 Донат</a>
+      </div>
+    </div>
+
+    <div class="modal profile-editor-modal" id="editProfileModal" aria-hidden="true" style="z-index: 220;">
+      <div class="modal-card profile-editor-card">
+        <div class="profile-editor-header">
+          <div>
+            <p class="kicker">Профиль</p>
+            <h3>Редактировать информацию</h3>
+          </div>
+          <div class="profile-editor-icon">✏️</div>
+        </div>
+        <form id="profileForm" class="stack-form">
+          <label class="profile-editor-label">
+            Никнейм
+            <input class="profile-editor-input" type="text" id="nickInput" maxlength="24" required />
+          </label>
+          <label class="profile-editor-label">
+            Сервер
+            <input class="profile-editor-input" type="text" id="serverInput" maxlength="24" required />
+          </label>
+          <div class="profile-editor-actions">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+            <button class="btn btn-ghost" id="cancelEditProfileBtn" type="button">Отмена</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="dropModal" aria-hidden="true">
+      <div class="modal-card drop-modal-card">
+        <p class="kicker" id="dropModalTitle">Выпал предмет</p>
+        <div id="dropSingleView" class="drop-single-view">
+          <div class="drop-card">
+            <div class="drop-card-glow"></div>
+            <div class="drop-card-body">
+              <div class="drop-image-frame">
+                <img id="dropImg" src="" alt="">
+              </div>
+              <div class="drop-info">
+                <span id="dropRarityBadge" class="drop-rarity-pill">---</span>
+                <h3 id="dropName">---</h3>
+                <div class="drop-value" id="dropValue">0 BC</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="dropMultiView" class="drop-multi-view">
+          <div class="drop-multi-grid" id="dropMultiList"></div>
+        </div>
+        <div id="dropMultiSummary" class="drop-multi-summary is-hidden">
+          <div class="summary-chip">
+            <span>Сумма серии</span>
+            <strong id="dropMultiTotal">0 BC</strong>
+          </div>
+          <div class="summary-chip">
+            <span>Лучший дроп</span>
+            <strong id="dropMultiBest">---</strong>
+          </div>
+        </div>
+        <div class="drop-actions">
+          <button class="btn btn-primary" id="closeModalBtn" type="button">Забрать в инвентарь</button>
+          <button class="btn btn-gold" id="sellDropBtn" type="button">Продать предмет</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="galleryModal" aria-hidden="true" style="z-index: 180;">
+      <div class="modal-card gallery-modal-card">
+        <p class="kicker">Выбор предмета</p>
+        <h3 style="margin-bottom: 8px;">Добавление на выставку</h3>
+        <p style="font-size: 13px; color: #8aa7c7; margin-bottom: 16px;">Выберите предмет из инвентаря. Он останется в вашем инвентаре, но появится на витрине до тех пор, пока вы его не снимете.</p>
+        <div class="gallery-modal-body" id="galleryInventoryList"></div>
+        <button class="btn btn-ghost" id="closeGalleryModalBtn" type="button" style="margin-top: 16px;">Закрыть</button>
+      </div>
+    </div>
+
+    <div class="modal" id="playerProfileModal" aria-hidden="true" style="z-index:210;">
+      <div class="player-profile-card" id="playerProfileCard">
+        <button class="item-detail-close" id="closePlayerProfileModal" type="button" aria-label="Закрыть">✕</button>
+
+        <!-- Шапка -->
+        <div class="pp-header" id="ppHeader">
+          <div class="pp-avatar-wrap">
+            <img class="pp-avatar" id="ppAvatar" src="img/avatar_placeholder.png" alt="avatar">
+            <span class="pp-rank-badge" id="ppRankBadge">1</span>
+          </div>
+          <div class="pp-header-info">
+            <div class="pp-nick" id="ppNick">Игрок</div>
+            <div class="pp-server" id="ppServer">Black Russia</div>
+            <div class="pp-score-row">
+              <span class="pp-score-label">Счёт</span>
+              <span class="pp-score" id="ppScore">0 BC</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="pp-stats-grid">
+          <div class="pp-stat-cell">
+            <span class="pp-stat-label">Баланс</span>
+            <strong class="pp-stat-val pp-val-gold" id="ppBalance">0 BC</strong>
+          </div>
+          <div class="pp-stat-cell">
+            <span class="pp-stat-label">Стоим. инвентаря</span>
+            <strong class="pp-stat-val pp-val-green" id="ppInvValue">0 BC</strong>
+          </div>
+          <div class="pp-stat-cell">
+            <span class="pp-stat-label">Кейсов открыто</span>
+            <strong class="pp-stat-val" id="ppCasesOpened">0</strong>
+          </div>
+          <div class="pp-stat-cell">
+            <span class="pp-stat-label">Любимый кейс</span>
+            <strong class="pp-stat-val pp-val-blue" id="ppFavCase">—</strong>
+          </div>
+          <div class="pp-stat-cell">
+            <span class="pp-stat-label">Продано предметов</span>
+            <strong class="pp-stat-val" id="ppItemsSold">0</strong>
+          </div>
+          <div class="pp-stat-cell">
+            <span class="pp-stat-label">Заработано</span>
+            <strong class="pp-stat-val pp-val-gold" id="ppValueSold">0 BC</strong>
+          </div>
+        </div>
+
+        <!-- Витрина игрока -->
+        <div class="pp-section-title" id="ppShowcaseTitle">Витрина</div>
+        <div class="pp-showcase" id="ppShowcase"></div>
+
+        <!-- Топ инвентарь -->
+        <div class="pp-section-title" id="ppTopInvTitle">Топ предметы</div>
+        <div class="pp-top-inv" id="ppTopInv"></div>
+      </div>
+    </div>
+
+    <div class="modal" id="itemDetailModal" aria-hidden="true" style="z-index:200;">
+      <div class="item-detail-card" id="itemDetailCard">
+        <button class="item-detail-close" id="closeItemDetailModal" type="button" aria-label="Закрыть">✕</button>
+        <div class="item-detail-img-section" id="itemDetailImgSection">
+          <span class="item-detail-sticker" id="itemDetailSticker"></span>
+          <span class="item-detail-promoted-badge" id="itemDetailPromotedBadge">🔝 ТОП</span>
+          <img class="item-detail-img" id="itemDetailImg" src="" alt="">
+          <span class="item-detail-rarity-pill" id="itemDetailRarityPill"></span>
+        </div>
+        <div class="item-detail-body">
+          <div class="item-detail-name-row">
+            <p class="item-detail-name" id="itemDetailName"></p>
+          </div>
+          <p class="item-detail-caption" id="itemDetailCaption"></p>
+          <div class="item-detail-row">
+            <span class="item-detail-price" id="itemDetailPrice"></span>
+            <button class="gallery-like-btn item-detail-like-btn" id="itemDetailLikeBtn" type="button">
+              <span id="itemDetailLikeIcon">♡</span>
+              <strong id="itemDetailLikeCount">0</strong>
+            </button>
+          </div>
+          <div class="item-detail-divider"></div>
+          <div class="item-detail-owner-row">
+            <div class="gallery-owner-avatar">👤</div>
+            <div>
+              <div class="gallery-owner-nick" id="itemDetailOwnerNick"></div>
+              <div class="gallery-owner-server" id="itemDetailOwnerServer"></div>
+            </div>
+          </div>
+          <p class="item-detail-date" id="itemDetailDate"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="wheelModal" aria-hidden="true" style="z-index: 188;">
+      <div class="modal-card wheel-modal-card">
+        <p class="kicker">Колесо удачи</p>
+        <h3 class="wheel-modal-h3">Крути &mdash; выигрывай!</h3>
+        <div class="wheel-container">
+          <div class="wheel-pointer">&#9660;</div>
+          <canvas id="wheelCanvas" width="280" height="280"></canvas>
+        </div>
+        <p id="wheelStatusText" class="wheel-status-text"></p>
+        <button class="btn btn-primary" id="spinWheelBtn" type="button" style="width:100%;">🎰 Крутить!</button>
+        <button class="btn btn-ghost" id="closeWheelModalBtn" type="button" style="margin-top:10px;width:100%;">Закрыть</button>
+      </div>
+    </div>
+
+    <div class="modal" id="customizeModal" aria-hidden="true" style="z-index: 190;">
+      <div class="modal-card customize-modal-card">
+        <div class="customize-modal-header">
+          <div class="customize-modal-title-group">
+            <p class="kicker">Витрина</p>
+            <h3>Оформление лота</h3>
+            <p id="customizeEntryName" class="customize-entry-name">—</p>
+          </div>
+          <div class="customize-balance-chip">
+            <span>💰</span>
+            <span id="customizeBalance">0 BC</span>
+          </div>
+        </div>
+        <div id="customizeOptionsContainer" class="customize-options-container"></div>
+        <button class="btn btn-ghost" id="closeCustomizeModalBtn" type="button" style="margin-top: 16px; width: 100%;">Закрыть</button>
+      </div>
+    </div>
+
+    <div class="modal" id="rouletteModal" aria-hidden="true" style="z-index: 150;">
+      <div class="roulette-grid" id="rouletteGrid"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
