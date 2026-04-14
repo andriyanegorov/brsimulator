@@ -127,3 +127,34 @@ commit;
 -- If RLS is enabled, add policies allowing your bot flow.
 -- With Apps Script + anon key, prefer strict policies by telegram_id or disabled RLS only for testing.
 -- =============================================
+
+-- =============================================
+-- 5) chat_messages: Global chat for all players
+-- =============================================
+create table if not exists public.chat_messages (
+  id bigserial primary key,
+  player_id text not null,
+  player_nick text not null,
+  player_avatar text default '👤',
+  message text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Indexes for performance
+create index if not exists idx_chat_messages_created_at on public.chat_messages(created_at desc);
+create index if not exists idx_chat_messages_player_id on public.chat_messages(player_id);
+
+-- Trigger for updated_at
+drop trigger if exists trg_chat_messages_updated_at on public.chat_messages;
+create trigger trg_chat_messages_updated_at
+before update on public.chat_messages
+for each row
+execute function public.set_updated_at();
+
+-- Keep chat clean: delete messages older than 30 days
+-- (Optional: run manually or set up a cron job in pg_cron extension)
+-- delete from public.chat_messages where created_at < now() - interval '30 days';
+
+commit;
+

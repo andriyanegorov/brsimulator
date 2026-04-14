@@ -746,9 +746,10 @@ function ensureStateShape(state) {
   return safe;
 }
 
-function getCurrentPlayer(state) {
+function getCurrentPlayer(state = {}) {
+  const players = Array.isArray(state.players) ? state.players : [];
   const currentId = state.currentPlayerId != null ? String(state.currentPlayerId) : null;
-  return state.players.find((player) => String(player.id) === currentId) || state.players[0];
+  return players.find((player) => String(player.id) === currentId) || players[0] || null;
 }
 
 function formatBC(value) {
@@ -5126,9 +5127,308 @@ async function bootstrap() {
 
 bootstrap();
 
+/* ======================================================
+   GLOBAL CHAT SYSTEM
+   ====================================================== */
 
+const ChatSystem = (function () {
+  const chatModal = document.getElementById('chatModal');
+  const chatFabBtn = document.getElementById('chatFabBtn');
+  const chatCloseBtn = document.getElementById('chatCloseBtn');
+  const chatInput = document.getElementById('chatInput');
+  const chatSendBtn = document.getElementById('chatSendBtn');
+  const chatMessages = document.getElementById('chatMessages');
+  const chatBadge = document.getElementById('chatBadge');
+  const chatOnlineCount = document.getElementById('chatOnlineCount');
 
+  let messages = [];
+  let isOpen = false;
+  let unreadCount = 0;
+  let lastMessageTime = 0;
+  let isLoadingMessages = false;
 
+  // Open/Close handlers
+  function openChat() {
+    isOpen = true;
+    chatModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    document.body.classList.add('chat-open');
+    loadMessages();
+    unreadCount = 0;
+    updateBadge();
+  }
+
+  function closeChat() {
+    isOpen = false;
+    chatModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    document.body.classList.remove('chat-open');
+  }
+
+  function toggleChat() {
+    isOpen ? closeChat() : openChat();
+  }
+
+  // Load messages from Supabase
+  async function loadMessages() {
+    if (isLoadingMessages) return;
+    isLoadingMessages = true;
+
+    try {
+      const { data: msgs, error } = await supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (error) {
+        console.error('Ошибка загрузки сообщений:', error);
+        return;
+      }
+
+      const newMessages = msgs || [];
+      const prevMessages = messages;
+      const prevCount = prevMessages.length;
+      const canAppend = prevCount > 0 && newMessages.length > prevCount && newMessages.slice(0, prevCount).every((msg, idx) => msg.id === prevMessages[idx].id);
+
+      messages = newMessages;
+      lastMessageTime = messages.length > 0 ? new Date(messages[messages.length - 1].created_at).getTime() : 0;
+
+      if (canAppend) {
+        appendNewMessages(newMessages.slice(prevCount));
+      } else {
+        renderMessages();
+        scrollToBottom();
+      }
+    } catch (err) {
+      console.error('Ошибка при загрузке сообщений:', err);
+    } finally {
+      isLoadingMessages = false;
+    }
+  }
+
+  function appendNewMessages(newMessages) {
+    if (!newMessages.length) return;
+
+    const currentPlayerId = globalState?.currentPlayerId;
+    const nodes = newMessages.map((msg) => {
+      const isOwn = String(msg.player_id) === String(currentPlayerId);
+      const timeStr = formatMessageTime(msg.created_at);
+      const avatarUrl = msg.player_avatar || '';
+      const avatarContent = avatarUrl
+        ? `<img class="chat-message-avatar-img" src="${escapeAttr(avatarUrl)}" alt="avatar" onerror="this.src='img/avatar_placeholder.png'" />`
+        : getPlayerAvatar(msg.player_nick);
+
+      return `
+        <div class="chat-message new ${isOwn ? 'own' : ''}">
+          <div class="chat-message-avatar">${avatarContent}</div>
+          <div class="chat-message-bubble">
+            ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.player_nick)}</div>` : ''}
+            <p class="chat-message-text">${escapeHtml(msg.message)}</p>
+            <div class="chat-message-time">${timeStr}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (chatMessages.querySelector('.chat-empty-state')) {
+      chatMessages.innerHTML = '';
+    }
+
+    chatMessages.insertAdjacentHTML('beforeend', nodes);
+    scrollToBottom();
+
+    setTimeout(() => {
+      chatMessages.querySelectorAll('.chat-message.new').forEach((el) => el.classList.remove('new'));
+    }, 400);
+  }
+
+  // Send message
+  async function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    const currentPlayer = getCurrentPlayer(globalState || {});
+    if (!currentPlayer) {
+      console.warn('Chat: не найден текущий игрок. Сообщение не отправлено.');
+      return;
+    }
+
+    const playerId = currentPlayer.id || globalState?.currentPlayerId;
+    if (!playerId) {
+      console.warn('Chat: currentPlayerId отсутствует.');
+      return;
+    }
+
+    chatInput.value = '';
+    chatSendBtn.disabled = true;
+
+    try {
+      const { error } = await supabaseClient
+        .from('chat_messages')
+        .insert([{
+          player_id: String(playerId),
+          player_nick: currentPlayer.nick || 'Unknown',
+          player_avatar: currentPlayer.stats?.photo_url || '',
+          message: text,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (error) {
+        console.error('Ошибка отправки сообщения:', error);
+        chatInput.value = text; // Restore text on error
+      } else {
+        await loadMessages();
+      }
+    } catch (err) {
+      console.error('Ошибка при отправке сообщения:', err);
+      chatInput.value = text;
+    } finally {
+      chatSendBtn.disabled = false;
+      chatInput.focus();
+    }
+  }
+
+  // Render messages
+  function renderMessages() {
+    if (messages.length === 0) {
+      chatMessages.innerHTML = `
+        <div class="chat-empty-state">
+          <div class="empty-icon">🎮</div>
+          <p>Пока нет сообщений</p>
+        </div>
+      `;
+      return;
+    }
+
+    const currentPlayerId = globalState?.currentPlayerId;
+    chatMessages.innerHTML = messages.map((msg) => {
+      const isOwn = String(msg.player_id) === String(currentPlayerId);
+      const timeStr = formatMessageTime(msg.created_at);
+      const avatarUrl = msg.player_avatar || '';
+      const avatarContent = avatarUrl
+        ? `<img class="chat-message-avatar-img" src="${escapeAttr(avatarUrl)}" alt="avatar" onerror="this.src='img/avatar_placeholder.png'" />`
+        : getPlayerAvatar(msg.player_nick);
+
+      return `
+        <div class="chat-message ${isOwn ? 'own' : ''}">
+          <div class="chat-message-avatar">${avatarContent}</div>
+          <div class="chat-message-bubble">
+            ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.player_nick)}</div>` : ''}
+            <p class="chat-message-text">${escapeHtml(msg.message)}</p>
+            <div class="chat-message-time">${timeStr}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 0);
+  }
+
+  function updateBadge() {
+    if (unreadCount > 0) {
+      chatBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+      chatBadge.style.display = 'flex';
+    } else {
+      chatBadge.style.display = 'none';
+    }
+  }
+
+  function formatMessageTime(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'сейчас';
+    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffDays < 7) return `${diffDays} дн назад`;
+
+    return date.toLocaleDateString('ru-RU');
+  }
+
+  function getPlayerAvatar(nick) {
+    const avatars = ['🎮', '👾', '🎯', '🏆', '⚡', '🔥', '💎', '🌟', '🎨', '🚀'];
+    let hash = 0;
+    for (let i = 0; i < nick.length; i++) {
+      hash = ((hash << 5) - hash) + nick.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return avatars[Math.abs(hash) % avatars.length];
+  }
+
+  function escapeAttr(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Event listeners
+  chatFabBtn.addEventListener('click', toggleChat);
+  chatCloseBtn.addEventListener('click', closeChat);
+
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  chatSendBtn.addEventListener('click', sendMessage);
+
+  // Close on backdrop click
+  chatModal.addEventListener('click', (e) => {
+    if (e.target === chatModal) closeChat();
+  });
+
+  // Load messages periodically (every 3 seconds if chat is open)
+  setInterval(() => {
+    if (isOpen) {
+      loadMessages();
+    }
+  }, 3000);
+
+  return {
+    open: openChat,
+    close: closeChat,
+    toggle: toggleChat,
+    loadMessages,
+    incrementUnread() {
+      if (!isOpen) {
+        unreadCount++;
+        updateBadge();
+      }
+    }
+  };
+})();
+
+// Initialize chat on page load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    ChatSystem.loadMessages();
+  });
+} else {
+  ChatSystem.loadMessages();
+}
+
+// Listen for new messages via Supabase real-time (optional)
+// This would require setting up Postgres changes subscription
 
 
 
