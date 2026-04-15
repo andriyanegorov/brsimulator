@@ -137,6 +137,7 @@ create table if not exists public.chat_messages (
   player_nick text not null,
   player_avatar text default '👤',
   message text not null,
+  replied_to_id bigint,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -155,6 +156,55 @@ execute function public.set_updated_at();
 -- Keep chat clean: delete messages older than 30 days
 -- (Optional: run manually or set up a cron job in pg_cron extension)
 -- delete from public.chat_messages where created_at < now() - interval '30 days';
+
+-- Add replied_to_id column if it doesn't exist
+alter table if exists public.chat_messages
+  add column if not exists replied_to_id bigint;
+
+-- =============================================
+-- 6) personal_messages: Private DMs between players
+-- =============================================
+create table if not exists public.personal_messages (
+  id bigserial primary key,
+  sender_id text not null,
+  receiver_id text not null,
+  sender_nick text not null,
+  sender_avatar text default '👤',
+  message text not null,
+  replied_to_id bigint,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_personal_messages_chat on public.personal_messages(
+  (least(sender_id, receiver_id)), 
+  (greatest(sender_id, receiver_id)), 
+  created_at desc
+);
+create index if not exists idx_personal_messages_receiver on public.personal_messages(receiver_id, created_at desc);
+
+drop trigger if exists trg_personal_messages_updated_at on public.personal_messages;
+create trigger trg_personal_messages_updated_at
+before update on public.personal_messages
+for each row
+execute function public.set_updated_at();
+
+-- =============================================
+-- 7) message_reactions: Emoji reactions on messages
+-- =============================================
+create table if not exists public.message_reactions (
+  id bigserial primary key,
+  message_id bigint not null,
+  message_type text not null check (message_type in ('global', 'personal')),
+  player_id text not null,
+  player_nick text not null,
+  emoji text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_message_reactions_message on public.message_reactions(message_id, message_type);
+create index if not exists idx_message_reactions_player on public.message_reactions(player_id);
+create unique index if not exists idx_message_reactions_unique on public.message_reactions(message_id, message_type, player_id, emoji);
 
 commit;
 

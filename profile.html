@@ -105,6 +105,195 @@
           </section>
         </section>
       </main>
+
+      <!-- Chat Button (Top Right) -->
+      <button class="chat-fab" id="chatFabBtn" type="button" title="Открыть чат" aria-label="Открыть общий чат">
+        <span class="chat-fab-icon">💬</span>
+        <span class="chat-fab-badge" id="chatBadge" style="display: none;">0</span>
+      </button>
+
+      <!-- Global Chat Modal -->
+      <div class="chat-modal" id="chatModal" aria-hidden="true">
+        <div class="chat-container">
+          <!-- Chat Header -->
+          <div class="chat-header">
+            <div class="chat-header-info">
+              <h3 class="chat-title">💬 Общий чат</h3>
+              <span class="chat-online-count" id="chatOnlineCount">Общайтесь с игроками</span>
+            </div>
+            <div class="chat-header-actions">
+              <div class="chat-search-box" id="chatSearchBox" style="display: none;">
+                <input 
+                  type="text" 
+                  class="chat-search-input" 
+                  id="chatSearchInput" 
+                  placeholder="Поиск игрока..." 
+                  autocomplete="off"
+                >
+                <div class="chat-search-results" id="chatSearchResults"></div>
+              </div>
+              <button class="chat-search-btn" id="chatSearchBtn" type="button" aria-label="Поиск игрока" title="Поиск">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <path d="m21 21-4.35-4.35"></path>
+                </svg>
+              </button>
+            </div>
+            <button class="chat-close-btn" id="chatCloseBtn" type="button" aria-label="Закрыть чат">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Messages List -->
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-empty-state">
+              <div class="empty-icon">🎮</div>
+              <p>Пока нет сообщений</p>
+            </div>
+          </div>
+
+          <!-- Reply Preview (если выбрано) -->
+          <div class="reply-preview hidden" id="globalReplyPreview">
+            <div class="reply-preview-content">
+              <span class="reply-preview-text" id="globalReplyPreviewText"></span>
+              <button class="reply-preview-close" id="globalReplyPreviewClose" type="button">✕</button>
+            </div>
+          </div>
+
+          <!-- Message Input -->
+          <div class="chat-input-area">
+            <input 
+              type="text" 
+              class="chat-input" 
+              id="chatInput" 
+              placeholder="Напишите сообщение..." 
+              maxlength="256"
+              autocomplete="off"
+            >
+            <button class="chat-send-btn" id="chatSendBtn" type="button" title="Отправить">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16151496 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4429026 C0.994623095,2.0872131 0.837654326,3.0298075 1.15159189,3.97340589 L3.03521743,10.4144019 C3.03521743,10.5714993 3.19218622,10.7285967 3.50612381,10.7285967 L16.6915026,11.5140836 C16.6915026,11.5140836 17.1624089,11.5140836 17.1624089,12.0314256 C17.1624089,12.5487635 16.6915026,12.4744748 16.6915026,12.4744748 Z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Private Chat Modal -->
+      <div class="chat-modal" id="privateChat" aria-hidden="true">
+        <div class="chat-container">
+          <!-- Private Chat Header -->
+          <div class="chat-header">
+            <div class="chat-header-info">
+              <div class="chat-header-user">
+                <img id="privateChatUserAvatar" class="chat-user-avatar" src="" alt="">
+                <div>
+                  <h3 class="chat-title" id="privateChatTitle">......</h3>
+                  <span class="chat-online-count" id="privateChatOnlineStatus">Игрок</span>
+                </div>
+              </div>
+            </div>
+            <button class="chat-close-btn" id="privateChatCloseBtn" type="button" aria-label="Закрыть чат">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Messages List -->
+          <div class="chat-messages" id="privateMessages">
+            <div class="chat-empty-state">
+              <div class="empty-icon">💌</div>
+              <p>Нет сообщений</p>
+            </div>
+          </div>
+
+          <!-- Reply Preview (если выбрано) -->
+          <div class="reply-preview hidden" id="replyPreview">
+            <div class="reply-preview-content">
+              <span class="reply-preview-text" id="replyPreviewText"></span>
+              <button class="reply-preview-close" id="replyPreviewClose" type="button">✕</button>
+            </div>
+          </div>
+
+          <!-- Message Input -->
+          <div class="chat-input-area">
+            <input 
+              type="text" 
+              class="chat-input" 
+              id="privateInput" 
+              placeholder="Напишите сообщение..." 
+              maxlength="256"
+              autocomplete="off"
+            >
+            <button class="chat-send-btn" id="privateSendBtn" type="button" title="Отправить">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16151496 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4429026 C0.994623095,2.0872131 0.837654326,3.0298075 1.15159189,3.97340589 L3.03521743,10.4144019 C3.03521743,10.5714993 3.19218622,10.7285967 3.50612381,10.7285967 L16.6915026,11.5140836 C16.6915026,11.5140836 17.1624089,11.5140836 17.1624089,12.0314256 C17.1624089,12.5487635 16.6915026,12.4744748 16.6915026,12.4744748 Z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reactions Popup -->
+      <div class="reactions-popup" id="reactionsPopup" aria-hidden="true">
+        <button class="reaction-btn" data-emoji="❤️">❤️</button>
+        <button class="reaction-btn" data-emoji="👍">👍</button>
+        <button class="reaction-btn" data-emoji="👎">👎</button>
+        <button class="reaction-btn" data-emoji="😂">😂</button>
+        <button class="reaction-btn" data-emoji="😱">😱</button>
+      </div>
+
+      <!-- Message Actions Menu -->
+      <div class="message-actions-menu" id="messageActionsMenu" aria-hidden="true">
+        <button class="message-action-item" data-action="reply" type="button">
+          <span style="margin-right: 6px;">↩️</span> Ответить
+        </button>
+        <button class="message-action-item" data-action="react" type="button">
+          <span style="margin-right: 6px;">😊</span> Реакция
+        </button>
+        <button class="message-action-item" data-action="dm" type="button" style="display: none;" id="dmActionBtn">
+          <span style="margin-right: 6px;">💌</span> Написать ЛС
+        </button>
+      </div>
+
+      <!-- Friend Search Modal -->
+      <div class="modal-backdrop" id="friendSearchBackdrop" style="display: none;">
+        <div class="friend-search-modal" id="friendSearchModal">
+          <div class="friend-search-header">
+            <h2>🔍 Найти друзей</h2>
+            <button class="friend-search-close" id="friendSearchClose" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="friend-search-input-wrapper">
+            <input 
+              type="text" 
+              class="friend-search-input" 
+              id="friendSearchInput" 
+              placeholder="Ищите по нику..."
+              autocomplete="off"
+            >
+            <svg class="friend-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </div>
+
+          <div class="friend-search-results" id="friendSearchResults">
+            <div class="friend-search-empty">Начните вводить ник для поиска...</div>
+          </div>
+        </div>
+      </div>
+
       <nav class="bottom-nav glass beautiful-nav" id="bottomNav">
         <a class="nav-btn" href="index.html" data-target="home">
           <span class="nav-icon">🏠</span>
@@ -150,7 +339,43 @@
           </label>
           <label class="profile-editor-label">
             Сервер
-            <input class="profile-editor-input" type="text" id="serverInput" maxlength="24" required />
+            <div class="server-selector-wrapper">
+              <select class="server-selector" id="serverInput" required>
+                            <option value="Red">Red</option><option value="Green">Green</option><option value="Blue">Blue</option>
+                            <option value="Yellow">Yellow</option><option value="Orange">Orange</option><option value="Purple">Purple</option>
+                            <option value="Lime">Lime</option><option value="Pink">Pink</option><option value="Cherry">Cherry</option>
+                            <option value="Black">Black</option><option value="Indigo">Indigo</option><option value="White">White</option>
+                            <option value="Magenta">Magenta</option><option value="Crimson">Crimson</option><option value="Gold">Gold</option>
+                            <option value="Azure">Azure</option><option value="Platinum">Platinum</option><option value="Aqua">Aqua</option>
+                            <option value="Gray">Gray</option><option value="Ice">Ice</option><option value="Chilli">Chilli</option>
+                            <option value="Choco">Choco</option><option value="Moscow">Moscow</option><option value="SPB">SPB</option>
+                            <option value="Ufa">Ufa</option><option value="Sochi">Sochi</option><option value="Kazan">Kazan</option>
+                            <option value="Samara">Samara</option><option value="Rostov">Rostov</option><option value="Anapa">Anapa</option>
+                            <option value="EKB">EKB</option><option value="Krasnodar">Krasnodar</option><option value="Arzamas">Arzamas</option>
+                            <option value="Novosib">Novosib</option><option value="Grozny">Grozny</option><option value="Saratov">Saratov</option>
+                            <option value="Omsk">Omsk</option><option value="Irkutsk">Irkutsk</option><option value="Volgograd">Volgograd</option>
+                            <option value="Voronezh">Voronezh</option><option value="Belgorod">Belgorod</option><option value="Makhachkala">Makhachkala</option>
+                            <option value="Vladikavkaz">Vladikavkaz</option><option value="Vladivostok">Vladivostok</option><option value="Kaliningrad">Kaliningrad</option>
+                            <option value="Chelyabinsk">Chelyabinsk</option><option value="Krasnoyarsk">Krasnoyarsk</option><option value="Cheboksary">Cheboksary</option>
+                            <option value="Khabarovsk">Khabarovsk</option><option value="Perm">Perm</option><option value="Tula">Tula</option>
+                            <option value="Ryazan">Ryazan</option><option value="Murmansk">Murmansk</option><option value="Penza">Penza</option>
+                            <option value="Kursk">Kursk</option><option value="Arkhangelsk">Arkhangelsk</option><option value="Orenburg">Orenburg</option>
+                            <option value="Kirov">Kirov</option><option value="Kemerovo">Kemerovo</option><option value="Tyumen">Tyumen</option>
+                            <option value="Tolyatti">Tolyatti</option><option value="Ivanovo">Ivanovo</option><option value="Stavropol">Stavropol</option>
+                            <option value="Smolensk">Smolensk</option><option value="Pskov">Pskov</option><option value="Bryansk">Bryansk</option>
+                            <option value="Orel">Orel</option><option value="Yaroslavl">Yaroslavl</option><option value="Barnaul">Barnaul</option>
+                            <option value="Lipetsk">Lipetsk</option><option value="Ulyanovsk">Ulyanovsk</option><option value="Yakutsk">Yakutsk</option>
+                            <option value="Tambov">Tambov</option><option value="Bratsk">Bratsk</option><option value="Astrakhan">Astrakhan</option>
+                            <option value="Chita">Chita</option><option value="Kostroma">Kostroma</option><option value="Vladimir">Vladimir</option>
+                            <option value="Kaluga">Kaluga</option><option value="Novgorod">Novgorod</option><option value="Taganrog">Taganrog</option>
+                            <option value="Vologda">Vologda</option><option value="Tver">Tver</option><option value="Tomsk">Tomsk</option>
+                            <option value="Izhevsk">Izhevsk</option><option value="Surgut">Surgut</option><option value="Podolsk">Podolsk</option>
+                            <option value="Magadan">Magadan</option><option value="Cherepovets">Cherepovets</option><option value="Norilsk">Norilsk</option>
+              </select>
+              <svg class="server-selector-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
           </label>
           <div class="profile-editor-actions">
             <button class="btn btn-primary" type="submit">Сохранить</button>

@@ -71,7 +71,6 @@
           <section class="block glass rewards-block" id="bonusSection">
             <div class="block-head">
               <h3>Бонусы</h3>
-              <small>Бесплатная валюта каждый день</small>
             </div>
             <div class="rewards-grid">
               <div class="reward-card" id="dailyBonusCard"></div>
@@ -131,180 +130,6 @@
             <div id="previewItemList"></div>
           </section>
         </div>
-        </section>
-
-        <!-- ===== АПГРЕЙД 2.0 (case-battle style) ===== -->
-        <section class="view" data-view="upgrade">
-          <div class="upg2-page">
-            <h2 class="upg2-main-title">⚡ МОДЕРНИЗАЦИЯ 2.0</h2>
-
-            <div class="upg2-arena">
-              <!-- LEFT: your items -->
-              <div class="upg2-side upg2-left">
-                <div class="upg2-side-label">Выберите предмет (1)</div>
-                <div class="upg2-slots" id="labUpgradeSlots"></div>
-                <div class="upg2-side-sum">Сумма: <strong id="upgSumValue">0 BC</strong></div>
-              </div>
-
-              <!-- CENTER: chance ring -->
-              <div class="upg2-center">
-                <div class="upg2-circle-wrap" id="upgradeChanceRing">
-                  <div class="upg2-circle-outer">
-                    <svg viewBox="0 0 200 200" class="upg2-ring-svg">
-                      <defs>
-                        <linearGradient id="upgGrad2" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stop-color="#00e5ff"/>
-                          <stop offset="100%" stop-color="#76ff03"/>
-                        </linearGradient>
-                      </defs>
-                      <circle cx="100" cy="100" r="90" class="upg2-ring-bg"/>
-                      <circle cx="100" cy="100" r="90" class="upg2-ring-fill" id="upgradeRingFill"/>
-                    </svg>
-                    <div class="upg2-ring-label">
-                      <span class="upg2-ring-pct" id="upgradeChancePct">0%</span>
-                      <span class="upg2-ring-sub">ШАНС УСПЕХА</span>
-                    </div>
-                    <div class="upg2-circle-pointer" id="upgPointer"></div>
-                  </div>
-                </div>
-                <div class="upg2-balance-card">
-                  <div class="upg2-balance-top">
-                    <span class="upg2-balance-label">Доплата для шанса</span>
-                    <span class="upg2-balance-wallet">Баланс: <strong id="upgBalanceAvailable">0</strong> BC</span>
-                  </div>
-                  <input class="upg2-balance-range" type="range" id="upgBalanceSlider" min="0" max="0" value="0">
-                  <div class="upg2-balance-bottom">
-                    <span>Добавляете к ставке</span>
-                    <strong>+<span id="upgBalanceAdd">0</span> BC</strong>
-                  </div>
-                </div>
-                <button class="upg2-launch-btn" id="launchUpgradeBtn" type="button" disabled>
-                  <span class="upg2-launch-spark"></span>
-                  ПРОКАЧАТЬ
-                </button>
-              </div>
-
-              <!-- RIGHT: target item -->
-              <div class="upg2-side upg2-right">
-                <div class="upg2-side-label">Желаемый предмет</div>
-                <div class="upg2-target-box" id="upgTargetBox">
-                  <div class="upg2-target-empty" id="upgTargetEmpty">
-                    <span class="upg2-target-plus">+</span>
-                    <span>Выбрать цель</span>
-                  </div>
-                  <div class="upg2-target-filled" id="upgTargetFilled" style="display:none;">
-                    <button class="upg2-target-remove" id="upgTargetRemove" type="button">✕</button>
-                    <img id="upgTargetImg" src="" alt="">
-                    <span class="upg2-target-name" id="upgTargetName"></span>
-                    <span class="upg2-target-val" id="upgTargetVal"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Stats row -->
-
-            <!-- Inventory: my items -->
-            <section class="upg2-inv-section">
-              <div class="upg2-inv-header">
-                <h3 class="upg2-inv-title">Мои предметы</h3>
-                <div class="upg2-inv-filters">
-                  <input type="text" class="upg2-search" id="upgInvSearch" placeholder="Поиск...">
-                  <select class="upg2-sort" id="upgInvSort">
-                    <option value="value-desc">Дорогие</option>
-                    <option value="value-asc">Дешёвые</option>
-                    <option value="name">По имени</option>
-                  </select>
-                </div>
-              </div>
-              <div class="upg2-inventory" id="labUpgradeInventory"></div>
-            </section>
-
-            <!-- Target picker modal (full screen) -->
-            <div class="upg2-target-modal" id="upgTargetSection" style="display:none;">
-              <div class="upg2-target-modal-content">
-                <div class="upg2-target-modal-header">
-                  <h3 class="upg2-target-modal-title">Выберите желаемый предмет</h3>
-                  <button class="upg2-target-modal-close" id="upgCloseTarget" type="button">✕</button>
-                </div>
-                <div class="upg2-target-modal-toolbar">
-                  <input type="text" class="upg2-search" id="upgTargetSearch" placeholder="Поиск предмета...">
-                  <select class="upg2-sort" id="upgTargetSort">
-                    <option value="value-desc">Дорогие</option>
-                    <option value="value-asc">Дешёвые</option>
-                    <option value="name">По имени</option>
-                  </select>
-                  <select class="upg2-sort" id="upgTargetRarity">
-                    <option value="">Все предметы</option>
-                    <option value="car">Машины</option>
-                    <option value="skin">Скины</option>
-                    <option value="acc">Аксессуары</option>
-                  </select>
-                </div>
-                <div class="upg2-target-modal-body">
-                  <div class="upg2-target-grid" id="upgTargetGrid"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== КОНТРАКТ 2.0 (case-battle style) ===== -->
-        <section class="view" data-view="contract">
-          <div class="ctr2-page">
-            <h2 class="ctr2-main-title">📜 КОНТРАКТЫ</h2>
-
-            <!-- 10 slots grid -->
-            <div class="ctr2-slots-wrap">
-              <div class="ctr2-slots" id="labContractSlots"></div>
-            </div>
-
-            <!-- Info bar -->
-            <div class="ctr2-info-bar">
-              <div class="ctr2-info-left">
-                <span class="ctr2-counter" id="ctrCounter">Положите ещё минимум <strong>3</strong> предмета</span>
-              </div>
-              <div class="ctr2-info-right">
-                <span>СУММА КОНТРАКТА: <strong id="ctrSumValue">0 BC</strong></span>
-              </div>
-            </div>
-
-            <!-- Result range -->
-            <div class="ctr2-result-bar">
-              <div class="ctr2-range">
-                Вы получите предмет от <strong id="ctrRangeMin">0 BC</strong> до <strong id="ctrRangeMax">0 BC</strong>
-              </div>
-              <div class="ctr2-target-row">
-                <span>Цель:</span>
-                <div class="ctr2-target-chip" id="ctrTargetChip">
-                  <span class="ctr2-target-icon">🎲</span>
-                  <span id="ctrTargetLabel">СЛУЧАЙНАЯ</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Sign button -->
-            <button class="ctr2-sign-btn" id="launchContractBtn" type="button" disabled>
-              <span class="ctr2-sign-spark"></span>
-              ПОДПИСАТЬ!
-            </button>
-
-            <!-- My inventory -->
-            <section class="ctr2-inv-section">
-              <div class="ctr2-inv-header">
-                <h3 class="ctr2-inv-title">МОИ ПРЕДМЕТЫ</h3>
-                <div class="ctr2-inv-filters">
-                  <input type="text" class="ctr2-search" id="ctrInvSearch" placeholder="Поиск...">
-                  <select class="ctr2-sort" id="ctrInvSort">
-                    <option value="value-desc">Дорогие</option>
-                    <option value="value-asc">Дешёвые</option>
-                    <option value="name">По имени</option>
-                  </select>
-                </div>
-              </div>
-              <div class="ctr2-inventory" id="labContractInventory"></div>
-            </section>
-          </div>
         </section>
 
           <section class="view" data-view="gallery">
@@ -430,7 +255,25 @@
           <div class="chat-header">
             <div class="chat-header-info">
               <h3 class="chat-title">💬 Общий чат</h3>
-              <span class="chat-online-count" id="chatOnlineCount">0 онлайн</span>
+              <span class="chat-online-count" id="chatOnlineCount">Общайтесь с игроками</span>
+            </div>
+            <div class="chat-header-actions">
+              <div class="chat-search-box" id="chatSearchBox" style="display: none;">
+                <input 
+                  type="text" 
+                  class="chat-search-input" 
+                  id="chatSearchInput" 
+                  placeholder="Поиск игрока..." 
+                  autocomplete="off"
+                >
+                <div class="chat-search-results" id="chatSearchResults"></div>
+              </div>
+              <button class="chat-search-btn" id="chatSearchBtn" type="button" aria-label="Поиск игрока" title="Поиск">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <path d="m21 21-4.35-4.35"></path>
+                </svg>
+              </button>
             </div>
             <button class="chat-close-btn" id="chatCloseBtn" type="button" aria-label="Закрыть чат">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -445,6 +288,14 @@
             <div class="chat-empty-state">
               <div class="empty-icon">🎮</div>
               <p>Пока нет сообщений</p>
+            </div>
+          </div>
+
+          <!-- Reply Preview (если выбрано) -->
+          <div class="reply-preview hidden" id="globalReplyPreview">
+            <div class="reply-preview-content">
+              <span class="reply-preview-text" id="globalReplyPreviewText"></span>
+              <button class="reply-preview-close" id="globalReplyPreviewClose" type="button">✕</button>
             </div>
           </div>
 
@@ -463,6 +314,118 @@
                 <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16151496 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4429026 C0.994623095,2.0872131 0.837654326,3.0298075 1.15159189,3.97340589 L3.03521743,10.4144019 C3.03521743,10.5714993 3.19218622,10.7285967 3.50612381,10.7285967 L16.6915026,11.5140836 C16.6915026,11.5140836 17.1624089,11.5140836 17.1624089,12.0314256 C17.1624089,12.5487635 16.6915026,12.4744748 16.6915026,12.4744748 Z"/>
               </svg>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Private Chat Modal -->
+      <div class="chat-modal" id="privateChat" aria-hidden="true">
+        <div class="chat-container">
+          <!-- Private Chat Header -->
+          <div class="chat-header">
+            <div class="chat-header-info">
+              <div class="chat-header-user">
+                <img id="privateChatUserAvatar" class="chat-user-avatar" src="" alt="">
+                <div>
+                  <h3 class="chat-title" id="privateChatTitle">......</h3>
+                  <span class="chat-online-count" id="privateChatOnlineStatus">Игрок</span>
+                </div>
+              </div>
+            </div>
+            <button class="chat-close-btn" id="privateChatCloseBtn" type="button" aria-label="Закрыть чат">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Messages List -->
+          <div class="chat-messages" id="privateMessages">
+            <div class="chat-empty-state">
+              <div class="empty-icon">💌</div>
+              <p>Нет сообщений</p>
+            </div>
+          </div>
+
+          <!-- Reply Preview (если выбрано) -->
+          <div class="reply-preview hidden" id="replyPreview">
+            <div class="reply-preview-content">
+              <span class="reply-preview-text" id="replyPreviewText"></span>
+              <button class="reply-preview-close" id="replyPreviewClose" type="button">✕</button>
+            </div>
+          </div>
+
+          <!-- Message Input -->
+          <div class="chat-input-area">
+            <input 
+              type="text" 
+              class="chat-input" 
+              id="privateInput" 
+              placeholder="Напишите сообщение..." 
+              maxlength="256"
+              autocomplete="off"
+            >
+            <button class="chat-send-btn" id="privateSendBtn" type="button" title="Отправить">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16151496 C3.34915502,0.9 2.40734225,0.9 1.77946707,1.4429026 C0.994623095,2.0872131 0.837654326,3.0298075 1.15159189,3.97340589 L3.03521743,10.4144019 C3.03521743,10.5714993 3.19218622,10.7285967 3.50612381,10.7285967 L16.6915026,11.5140836 C16.6915026,11.5140836 17.1624089,11.5140836 17.1624089,12.0314256 C17.1624089,12.5487635 16.6915026,12.4744748 16.6915026,12.4744748 Z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reactions Popup -->
+      <div class="reactions-popup" id="reactionsPopup" aria-hidden="true">
+        <button class="reaction-btn" data-emoji="❤️">❤️</button>
+        <button class="reaction-btn" data-emoji="👍">👍</button>
+        <button class="reaction-btn" data-emoji="👎">👎</button>
+        <button class="reaction-btn" data-emoji="😂">😂</button>
+        <button class="reaction-btn" data-emoji="😱">😱</button>
+      </div>
+
+      <!-- Message Actions Menu -->
+      <div class="message-actions-menu" id="messageActionsMenu" aria-hidden="true">
+        <button class="message-action-item" data-action="reply" type="button">
+          <span style="margin-right: 6px;">↩️</span> Ответить
+        </button>
+        <button class="message-action-item" data-action="react" type="button">
+          <span style="margin-right: 6px;">😊</span> Реакция
+        </button>
+        <button class="message-action-item" data-action="dm" type="button" style="display: none;" id="dmActionBtn">
+          <span style="margin-right: 6px;">💌</span> Написать ЛС
+        </button>
+      </div>
+
+      <!-- Friend Search Modal -->
+      <div class="modal-backdrop" id="friendSearchBackdrop" style="display: none;">
+        <div class="friend-search-modal" id="friendSearchModal">
+          <div class="friend-search-header">
+            <h2>🔍 Найти друзей</h2>
+            <button class="friend-search-close" id="friendSearchClose" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="friend-search-input-wrapper">
+            <input 
+              type="text" 
+              class="friend-search-input" 
+              id="friendSearchInput" 
+              placeholder="Ищите по нику..."
+              autocomplete="off"
+            >
+            <svg class="friend-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </div>
+
+          <div class="friend-search-results" id="friendSearchResults">
+            <div class="friend-search-empty">Начните вводить ник для поиска...</div>
           </div>
         </div>
       </div>

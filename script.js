@@ -752,6 +752,12 @@ function getCurrentPlayer(state = {}) {
   return players.find((player) => String(player.id) === currentId) || players[0] || null;
 }
 
+function getPlayerBadgesById(playerId) {
+  if (!globalState || !Array.isArray(globalState.players)) return [];
+  const player = globalState.players.find(p => String(p.id) === String(playerId));
+  return Array.isArray(player?.badges) ? player.badges : [];
+}
+
 function formatBC(value) {
   return `${Math.max(0, Math.round(value)).toLocaleString("ru-RU")} BC`;
 }
@@ -3790,8 +3796,21 @@ function renderMainApp() {
         return;
       }
 
-      player.nick = nickInput.value.trim() || player.nick;
-      player.server = serverInput.value.trim() || player.server;
+      const nickValue = nickInput.value.trim();
+      const serverValue = serverInput.value.trim();
+      
+      if (!nickValue) {
+        showToast("Введите никнейм");
+        return;
+      }
+      
+      if (!serverValue) {
+        showToast("Выберите сервер");
+        return;
+      }
+
+      player.nick = nickValue;
+      player.server = serverValue;
       saveState(state);
       
       // Hide form modal and update UI
@@ -5128,6 +5147,51 @@ async function bootstrap() {
 bootstrap();
 
 /* ======================================================
+   SHARED CHAT UTILITIES
+   ====================================================== */
+
+function formatMessageTime(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'сейчас';
+  if (diffMins < 60) return `${diffMins} мин назад`;
+  if (diffHours < 24) return `${diffHours} ч назад`;
+  if (diffDays < 7) return `${diffDays} дн назад`;
+
+  return date.toLocaleDateString('ru-RU');
+}
+
+function getPlayerAvatar(nick) {
+  const avatars = ['🎮', '👾', '🎯', '🏆', '⚡', '🔥', '💎', '🌟', '🎨', '🚀'];
+  let hash = 0;
+  for (let i = 0; i < nick.length; i++) {
+    hash = ((hash << 5) - hash) + nick.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return avatars[Math.abs(hash) % avatars.length];
+}
+
+function escapeAttr(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/* ======================================================
    GLOBAL CHAT SYSTEM
    ====================================================== */
 
@@ -5140,12 +5204,16 @@ const ChatSystem = (function () {
   const chatMessages = document.getElementById('chatMessages');
   const chatBadge = document.getElementById('chatBadge');
   const chatOnlineCount = document.getElementById('chatOnlineCount');
+  const globalReplyPreview = document.getElementById('globalReplyPreview');
+  const globalReplyPreviewText = document.getElementById('globalReplyPreviewText');
+  const globalReplyPreviewClose = document.getElementById('globalReplyPreviewClose');
 
   let messages = [];
   let isOpen = false;
   let unreadCount = 0;
   let lastMessageTime = 0;
   let isLoadingMessages = false;
+  let selectedReplyToId = null;
 
   // Open/Close handlers
   function openChat() {
@@ -5200,10 +5268,58 @@ const ChatSystem = (function () {
         renderMessages();
         scrollToBottom();
       }
+
+      // Load reactions for global chat
+      await loadGlobalReactions();
     } catch (err) {
       console.error('Ошибка при загрузке сообщений:', err);
     } finally {
       isLoadingMessages = false;
+    }
+  }
+
+  async function loadGlobalReactions() {
+    if (!messages.length) return;
+
+    const messageIds = messages.map(m => m.id);
+    try {
+      const { data: reactions, error } = await supabaseClient
+        .from('message_reactions')
+        .select('*')
+        .eq('message_type', 'global')
+        .in('message_id', messageIds);
+
+      if (error || !reactions) {
+        console.error('Ошибка загрузки реакций:', error);
+        return;
+      }
+
+      // Group reactions by message_id
+      const reactionsByMessage = {};
+      reactions.forEach(r => {
+        if (!reactionsByMessage[r.message_id]) {
+          reactionsByMessage[r.message_id] = {};
+        }
+        if (!reactionsByMessage[r.message_id][r.emoji]) {
+          reactionsByMessage[r.message_id][r.emoji] = [];
+        }
+        reactionsByMessage[r.message_id][r.emoji].push(r.player_nick);
+      });
+
+      // Render reactions for each message
+      Object.entries(reactionsByMessage).forEach(([msgId, emojiMap]) => {
+        const reactionsContainer = document.getElementById(`reactions-${msgId}`);
+        if (!reactionsContainer) return;
+
+        const reactionsHtml = Object.entries(emojiMap).map(([emoji, nicks]) => {
+          const title = nicks.join(', ');
+          return `<span class="reaction-chip" title="${escapeAttr(title)}">${emoji} ${nicks.length}</span>`;
+        }).join('');
+
+        reactionsContainer.innerHTML = reactionsHtml;
+      });
+    } catch (err) {
+      console.error('Ошибка при загрузке реакций:', err);
     }
   }
 
@@ -5219,13 +5335,25 @@ const ChatSystem = (function () {
         ? `<img class="chat-message-avatar-img" src="${escapeAttr(avatarUrl)}" alt="avatar" onerror="this.src='img/avatar_placeholder.png'" />`
         : getPlayerAvatar(msg.player_nick);
 
+      let replyHtml = '';
+      if (msg.replied_to_id) {
+        const numericReplyId = Number(msg.replied_to_id);
+        const repliedMsg = messages.find(m => m.id === numericReplyId);
+        if (repliedMsg) {
+          replyHtml = `<div class="chat-message-reply"><span class="chat-message-reply-nick">${escapeHtml(repliedMsg.player_nick)}</span><span class="chat-message-reply-text">${escapeHtml(repliedMsg.message)}</span></div>`;
+        }
+      }
+
       return `
-        <div class="chat-message new ${isOwn ? 'own' : ''}">
+        <div class="chat-message new ${isOwn ? 'own' : ''}" data-player-id="${escapeAttr(msg.player_id)}" data-player-nick="${escapeAttr(msg.player_nick)}" data-player-avatar="${escapeAttr(avatarUrl)}" data-message-id="${msg.id}">
           <div class="chat-message-avatar">${avatarContent}</div>
-          <div class="chat-message-bubble">
+          <div class="chat-message-bubble" data-message-id="${msg.id}">
             ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.player_nick)}</div>` : ''}
+            ${replyHtml}
             <p class="chat-message-text">${escapeHtml(msg.message)}</p>
             <div class="chat-message-time">${timeStr}</div>
+            <div class="message-reactions-list" id="reactions-${msg.id}"></div>
+            <button class="chat-message-actions-btn" data-message-id="${msg.id}" type="button" title="Больше">⋮</button>
           </div>
         </div>
       `;
@@ -5271,6 +5399,7 @@ const ChatSystem = (function () {
           player_nick: currentPlayer.nick || 'Unknown',
           player_avatar: currentPlayer.stats?.photo_url || '',
           message: text,
+          replied_to_id: selectedReplyToId,
           created_at: new Date().toISOString()
         }]);
 
@@ -5278,6 +5407,7 @@ const ChatSystem = (function () {
         console.error('Ошибка отправки сообщения:', error);
         chatInput.value = text; // Restore text on error
       } else {
+        clearGlobalReply();
         await loadMessages();
       }
     } catch (err) {
@@ -5287,6 +5417,31 @@ const ChatSystem = (function () {
       chatSendBtn.disabled = false;
       chatInput.focus();
     }
+  }
+
+  function setGlobalReply(messageId) {
+    // Convert to number in case it comes as string from dataset
+    const numericId = Number(messageId);
+    console.log('setGlobalReply called with ID:', messageId, 'Type:', typeof messageId, 'Numeric:', numericId);
+    
+    const msg = messages.find(m => m.id === numericId);
+    console.log('Found message:', msg, 'Messages array:', messages);
+    
+    if (!msg) {
+      console.warn('Message not found in messages array. Looking for ID:', numericId, 'Messages:', messages);
+      return;
+    }
+
+    selectedReplyToId = numericId;
+    const previewText = `Ответ ${msg.player_nick}: ${msg.message.substring(0, 50)}${msg.message.length > 50 ? '...' : ''}`;
+    globalReplyPreviewText.textContent = previewText;
+    globalReplyPreview.classList.remove('hidden');
+    console.log('Reply preview shown for:', previewText);
+  }
+
+  function clearGlobalReply() {
+    selectedReplyToId = null;
+    globalReplyPreview.classList.add('hidden');
   }
 
   // Render messages
@@ -5310,13 +5465,31 @@ const ChatSystem = (function () {
         ? `<img class="chat-message-avatar-img" src="${escapeAttr(avatarUrl)}" alt="avatar" onerror="this.src='img/avatar_placeholder.png'" />`
         : getPlayerAvatar(msg.player_nick);
 
+      let replyHtml = '';
+      if (msg.replied_to_id) {
+        const numericReplyId = Number(msg.replied_to_id);
+        const repliedMsg = messages.find(m => m.id === numericReplyId);
+        if (repliedMsg) {
+          replyHtml = `<div class="chat-message-reply"><span class="chat-message-reply-nick">${escapeHtml(repliedMsg.player_nick)}</span><span class="chat-message-reply-text">${escapeHtml(repliedMsg.message)}</span></div>`;
+        }
+      }
+
       return `
-        <div class="chat-message ${isOwn ? 'own' : ''}">
+        <div class="chat-message ${isOwn ? 'own' : ''}" data-player-id="${escapeAttr(msg.player_id)}" data-player-nick="${escapeAttr(msg.player_nick)}" data-player-avatar="${escapeAttr(avatarUrl)}" data-message-id="${msg.id}">
           <div class="chat-message-avatar">${avatarContent}</div>
-          <div class="chat-message-bubble">
-            ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.player_nick)}</div>` : ''}
+          <div class="chat-message-bubble" data-message-id="${msg.id}">
+            ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.player_nick)}<span class="player-badges-inline">${(() => {
+              const badges = getPlayerBadgesById(msg.player_id);
+              return badges.map(key => {
+                const b = BADGE_TYPES[key];
+                return b ? `<span class="player-badge ${b.cls}" data-badge-key="${key}" title="${b.title}">${BADGE_SVG[key]}</span>` : '';
+              }).join('');
+            })()}</span></div>` : ''}
+            ${replyHtml}
             <p class="chat-message-text">${escapeHtml(msg.message)}</p>
-            <div class="chat-message-time">${timeStr}</div>
+            <div class="chat-message-time">${timeStr} ${isOwn ? '✓✓' : ''}</div>
+            <div class="message-reactions-list" id="reactions-${msg.id}"></div>
+            <button class="chat-message-actions-btn" data-message-id="${msg.id}" type="button" title="Больше">⋮</button>
           </div>
         </div>
       `;
@@ -5338,47 +5511,6 @@ const ChatSystem = (function () {
     }
   }
 
-  function formatMessageTime(isoString) {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'сейчас';
-    if (diffMins < 60) return `${diffMins} мин назад`;
-    if (diffHours < 24) return `${diffHours} ч назад`;
-    if (diffDays < 7) return `${diffDays} дн назад`;
-
-    return date.toLocaleDateString('ru-RU');
-  }
-
-  function getPlayerAvatar(nick) {
-    const avatars = ['🎮', '👾', '🎯', '🏆', '⚡', '🔥', '💎', '🌟', '🎨', '🚀'];
-    let hash = 0;
-    for (let i = 0; i < nick.length; i++) {
-      hash = ((hash << 5) - hash) + nick.charCodeAt(i);
-      hash = hash & hash;
-    }
-    return avatars[Math.abs(hash) % avatars.length];
-  }
-
-  function escapeAttr(text) {
-    return String(text)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
   // Event listeners
   chatFabBtn.addEventListener('click', toggleChat);
   chatCloseBtn.addEventListener('click', closeChat);
@@ -5391,6 +5523,7 @@ const ChatSystem = (function () {
   });
 
   chatSendBtn.addEventListener('click', sendMessage);
+  globalReplyPreviewClose.addEventListener('click', clearGlobalReply);
 
   // Close on backdrop click
   chatModal.addEventListener('click', (e) => {
@@ -5409,6 +5542,7 @@ const ChatSystem = (function () {
     close: closeChat,
     toggle: toggleChat,
     loadMessages,
+    setGlobalReply,
     incrementUnread() {
       if (!isOpen) {
         unreadCount++;
@@ -5430,9 +5564,1075 @@ if (document.readyState === 'loading') {
 // Listen for new messages via Supabase real-time (optional)
 // This would require setting up Postgres changes subscription
 
+/* ======================================================
+   PRIVATE CHAT + REPLY + REACTIONS SYSTEM
+   ====================================================== */
 
+const PrivateChatSystem = (function () {
+  const privateChat = document.getElementById('privateChat');
+  const privateChatCloseBtn = document.getElementById('privateChatCloseBtn');
+  const privateInput = document.getElementById('privateInput');
+  const privateSendBtn = document.getElementById('privateSendBtn');
+  const privateMessages = document.getElementById('privateMessages');
+  const privateChatTitle = document.getElementById('privateChatTitle');
+  const replyPreview = document.getElementById('replyPreview');
+  const replyPreviewText = document.getElementById('replyPreviewText');
+  const replyPreviewClose = document.getElementById('replyPreviewClose');
+  const reactionsPopup = document.getElementById('reactionsPopup');
 
+  let currentReceiverId = null;
+  let messages = [];
+  let selectedReplyToId = null;
+  let selectedMessageForReaction = null;
+  let isLoadingMessages = false;
 
+  function openChat(receiverId, receiverNick, receiverAvatar) {
+    currentReceiverId = receiverId;
+    privateChatTitle.textContent = receiverNick;
+    document.getElementById('privateChatUserAvatar').src = receiverAvatar || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Ccircle cx="12" cy="12" r="12" fill="%2300d4ff" opacity="0.2"/%3E%3Ctext x="12" y="16" text-anchor="middle" fill="white" font-size="16"%3E👤%3C/text%3E%3C/svg%3E';
+    document.body.classList.add('private-chat-open');
+    privateChat.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    loadMessages();
+    privateInput.focus();
+  }
+
+  function closeChat() {
+    currentReceiverId = null;
+    document.body.classList.remove('private-chat-open');
+    privateChat.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    clearReply();
+  }
+
+  async function loadMessages() {
+    if (!currentReceiverId || isLoadingMessages) return;
+    isLoadingMessages = true;
+
+    try {
+      const currentId = globalState?.currentPlayerId;
+      const { data: msgs, error } = await supabaseClient
+        .from('personal_messages')
+        .select('*')
+        .or(
+          `and(sender_id.eq.${currentId},receiver_id.eq.${currentReceiverId}),` +
+          `and(sender_id.eq.${currentReceiverId},receiver_id.eq.${currentId})`
+        )
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (error) {
+        console.error('Ошибка загрузки личных сообщений:', error);
+        return;
+      }
+
+      const newMessages = msgs || [];
+      const prevCount = messages.length;
+      messages = newMessages;
+
+      if (prevCount > 0 && newMessages.length > prevCount) {
+        appendNewMessages(newMessages.slice(prevCount));
+      } else {
+        renderMessages();
+      }
+      
+      // Load reactions for all messages
+      await loadReactions();
+      scrollToBottom();
+    } catch (err) {
+      console.error('Ошибка при загрузке личных сообщений:', err);
+    } finally {
+      isLoadingMessages = false;
+    }
+  }
+
+  async function loadReactions() {
+    if (!messages.length) return;
+
+    const messageIds = messages.map(m => m.id);
+    try {
+      const { data: reactions, error } = await supabaseClient
+        .from('message_reactions')
+        .select('*')
+        .eq('message_type', 'personal')
+        .in('message_id', messageIds);
+
+      if (error || !reactions) {
+        console.error('Ошибка загрузки реакций:', error);
+        return;
+      }
+
+      // Group reactions by message_id
+      const reactionsByMessage = {};
+      reactions.forEach(r => {
+        if (!reactionsByMessage[r.message_id]) {
+          reactionsByMessage[r.message_id] = {};
+        }
+        if (!reactionsByMessage[r.message_id][r.emoji]) {
+          reactionsByMessage[r.message_id][r.emoji] = [];
+        }
+        reactionsByMessage[r.message_id][r.emoji].push(r.player_nick);
+      });
+
+      // Render reactions for each message
+      Object.entries(reactionsByMessage).forEach(([msgId, emojiMap]) => {
+        const reactionsContainer = document.getElementById(`reactions-${msgId}`);
+        if (!reactionsContainer) return;
+
+        const reactionsHtml = Object.entries(emojiMap).map(([emoji, nicks]) => {
+          const title = nicks.join(', ');
+          return `<span class="reaction-chip" title="${escapeAttr(title)}">${emoji} ${nicks.length}</span>`;
+        }).join('');
+
+        reactionsContainer.innerHTML = reactionsHtml;
+      });
+    } catch (err) {
+      console.error('Ошибка при загрузке реакций:', err);
+    }
+  }
+
+  function renderMessages() {
+    if (messages.length === 0) {
+      privateMessages.innerHTML = `
+        <div class="chat-empty-state">
+          <div class="empty-icon">💌</div>
+          <p>Нет сообщений</p>
+        </div>
+      `;
+      return;
+    }
+
+    const currentId = globalState?.currentPlayerId;
+    privateMessages.innerHTML = messages.map((msg) => {
+      const isOwn = msg.sender_id === currentId;
+      const timeStr = formatMessageTime(msg.created_at);
+      const avatarEmoji = getPlayerAvatar(msg.sender_nick);
+      const avatarHtml = msg.sender_avatar
+        ? `<img src="${escapeAttr(msg.sender_avatar)}" alt="" class="chat-message-avatar-img">`
+        : `<span>${avatarEmoji}</span>`;
+
+      let replyHtml = '';
+      if (msg.replied_to_id) {
+        const numericReplyId = Number(msg.replied_to_id);
+        const repliedMsg = messages.find(m => m.id === numericReplyId);
+        if (repliedMsg) {
+          replyHtml = `<div class="chat-message-reply"><span class="chat-message-reply-nick">${escapeHtml(repliedMsg.sender_nick)}</span><span class="chat-message-reply-text">${escapeHtml(repliedMsg.message)}</span></div>`;
+        }
+      }
+
+      return `
+        <div class="chat-message ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+          <div class="chat-message-avatar">${avatarHtml}</div>
+          <div class="chat-message-bubble" data-message-id="${msg.id}">
+            ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.sender_nick)}<span class="player-badges-inline">${(() => {
+              const badges = getPlayerBadgesById(msg.sender_id);
+              return badges.map(key => {
+                const b = BADGE_TYPES[key];
+                return b ? `<span class="player-badge ${b.cls}" data-badge-key="${key}" title="${b.title}">${BADGE_SVG[key]}</span>` : '';
+              }).join('');
+            })()}</span></div>` : ''}
+            ${replyHtml}
+            <p class="chat-message-text">${escapeHtml(msg.message)}</p>
+            <div class="chat-message-time">${timeStr} ${isOwn ? '✓✓' : ''}</div>
+            <div class="message-reactions-list" id="reactions-${msg.id}"></div>
+            <button class="chat-message-actions-btn" data-message-id="${msg.id}" type="button" title="Больше">⋮</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    attachMessageHandlers();
+  }
+
+  function appendNewMessages(newMessages) {
+    if (!newMessages.length) return;
+
+    const currentId = globalState?.currentPlayerId;
+    const nodes = newMessages.map((msg) => {
+      const isOwn = msg.sender_id === currentId;
+      const timeStr = formatMessageTime(msg.created_at);
+      const avatarEmoji = getPlayerAvatar(msg.sender_nick);
+      const avatarHtml = msg.sender_avatar
+        ? `<img src="${escapeAttr(msg.sender_avatar)}" alt="" class="chat-message-avatar-img">`
+        : `<span>${avatarEmoji}</span>`;
+
+      let replyHtml = '';
+      if (msg.replied_to_id) {
+        const numericReplyId = Number(msg.replied_to_id);
+        const repliedMsg = messages.find(m => m.id === numericReplyId);
+        if (repliedMsg) {
+          replyHtml = `<div class="chat-message-reply"><span class="chat-message-reply-nick">${escapeHtml(repliedMsg.sender_nick)}</span><span class="chat-message-reply-text">${escapeHtml(repliedMsg.message)}</span></div>`;
+        }
+      }
+
+      return `
+        <div class="chat-message new ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+          <div class="chat-message-avatar">${avatarHtml}</div>
+          <div class="chat-message-bubble" data-message-id="${msg.id}">
+            ${!isOwn ? `<div class="chat-message-nick">${escapeHtml(msg.sender_nick)}<span class="player-badges-inline">${(() => {
+              const badges = getPlayerBadgesById(msg.sender_id);
+              return badges.map(key => {
+                const b = BADGE_TYPES[key];
+                return b ? `<span class="player-badge ${b.cls}" data-badge-key="${key}" title="${b.title}">${BADGE_SVG[key]}</span>` : '';
+              }).join('');
+            })()}</span></div>` : ''}
+            ${replyHtml}
+            <p class="chat-message-text">${escapeHtml(msg.message)}</p>
+            <div class="chat-message-time">${timeStr} ${isOwn ? '✓✓' : ''}</div>
+            <div class="message-reactions-list" id="reactions-${msg.id}"></div>
+            <button class="chat-message-actions-btn" data-message-id="${msg.id}" type="button" title="Больше">⋮</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (privateMessages.querySelector('.chat-empty-state')) {
+      privateMessages.innerHTML = '';
+    }
+
+    privateMessages.insertAdjacentHTML('beforeend', nodes);
+    scrollToBottom();
+
+    setTimeout(() => {
+      privateMessages.querySelectorAll('.chat-message.new').forEach(el => el.classList.remove('new'));
+    }, 400);
+
+    attachMessageHandlers();
+  }
+
+  function attachMessageHandlers() {
+    document.querySelectorAll('#privateMessages .chat-message-bubble[data-message-id]').forEach(el => {
+      const messageId = el.dataset.messageId;
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      // Click to show reactions popup (but not if clicking the actions button)
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.chat-message-actions-btn')) return;
+        e.stopPropagation();
+        showMessageActions(e, messageId);
+      });
+
+      // Double-click to add heart reaction
+      el.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        selectedMessageForReaction = Number(messageId);
+        addReaction('❤️');
+      });
+
+      // Swipe left to reply
+      el.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      });
+
+      el.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const swipeDistance = touchStartX - touchEndX;
+        const verticalDistance = Math.abs(touchEndY - touchStartY);
+
+        // Require minimum horizontal distance and prevent diagonal swipes
+        if (swipeDistance > 50 && verticalDistance < 30) {
+          e.stopPropagation();
+          el.classList.add('reply-active');
+          setReply(Number(messageId));
+          setTimeout(() => {
+            el.classList.remove('reply-active');
+          }, 300);
+        }
+      });
+    });
+  }
+
+  function showMessageActions(e, messageId) {
+    selectedMessageForReaction = Number(messageId);
+    openReactionsPopup(e.target.closest('.chat-message-bubble'));
+  }
+
+  function openReactionsPopup(bubbleEl) {
+    if (!bubbleEl) return;
+    
+    reactionsPopup.setAttribute('aria-hidden', 'false');
+    
+    // Position the popup below the message bubble
+    const rect = bubbleEl.getBoundingClientRect();
+    const popupWidth = reactionsPopup.offsetWidth || 220;
+    
+    // Position below the message
+    reactionsPopup.style.position = 'fixed';
+    reactionsPopup.style.top = (rect.bottom + 8) + 'px';
+    reactionsPopup.style.left = Math.max(8, rect.left + rect.width / 2 - popupWidth / 2) + 'px';
+    reactionsPopup.style.right = 'auto';
+    reactionsPopup.style.bottom = 'auto';
+  }
+
+  async function sendMessage() {
+    const text = privateInput.value.trim();
+    if (!text || !currentReceiverId) return;
+
+    const currentPlayer = getCurrentPlayer(globalState || {});
+    if (!currentPlayer) return;
+
+    privateInput.value = '';
+    privateSendBtn.disabled = true;
+
+    try {
+      const { error } = await supabaseClient
+        .from('personal_messages')
+        .insert([{
+          sender_id: currentPlayer.id,
+          receiver_id: currentReceiverId,
+          sender_nick: currentPlayer.nick || 'Unknown',
+          sender_avatar: currentPlayer.stats?.photo_url || '',
+          message: text,
+          replied_to_id: selectedReplyToId,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (error) {
+        console.error('Ошибка отправки личного сообщения:', error);
+        privateInput.value = text;
+      } else {
+        clearReply();
+        await loadMessages();
+      }
+    } catch (err) {
+      console.error('Ошибка при отправке личного сообщения:', err);
+      privateInput.value = text;
+    } finally {
+      privateSendBtn.disabled = false;
+      privateInput.focus();
+    }
+  }
+
+  function setReply(messageId) {
+    const numericId = Number(messageId);
+    const msg = messages.find(m => m.id === numericId);
+    if (!msg) return;
+
+    selectedReplyToId = numericId;
+    replyPreviewText.textContent = `Ответ ${msg.sender_nick}: ${msg.message.substring(0, 50)}${msg.message.length > 50 ? '...' : ''}`;
+    replyPreview.classList.remove('hidden');
+  }
+
+  function clearReply() {
+    selectedReplyToId = null;
+    replyPreview.classList.add('hidden');
+  }
+
+  async function addReaction(emoji) {
+    if (!selectedMessageForReaction) return;
+
+    const currentPlayer = getCurrentPlayer(globalState);
+    if (!currentPlayer) return;
+
+    // Add visual feedback
+    const messageEl = document.querySelector(`[data-message-id="${selectedMessageForReaction}"]`);
+    if (messageEl) {
+      messageEl.classList.add('reaction-added');
+      setTimeout(() => {
+        messageEl.classList.remove('reaction-added');
+      }, 400);
+    }
+
+    try {
+      const playerId = globalState?.currentPlayerId;
+      
+      // First, delete any existing reactions from this player on this message
+      const { error: deleteError } = await supabaseClient
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', selectedMessageForReaction)
+        .eq('message_type', 'personal')
+        .eq('player_id', playerId);
+
+      if (deleteError) {
+        console.error('Ошибка при удалении старой реакции:', deleteError);
+      }
+
+      // Now add the new reaction
+      const { error: insertError } = await supabaseClient
+        .from('message_reactions')
+        .insert([{
+          message_id: selectedMessageForReaction,
+          message_type: 'personal',
+          player_id: playerId,
+          player_nick: currentPlayer.nick || 'Unknown',
+          emoji: emoji
+        }]);
+
+      if (!insertError) {
+        await loadMessages();
+      } else {
+        console.error('Ошибка при добавлении реакции:', insertError);
+      }
+    } catch (err) {
+      console.error('Ошибка при добавлении реакции:', err);
+    }
+
+    closeReactionsPopup();
+  }
+
+  function closeReactionsPopup() {
+    reactionsPopup.setAttribute('aria-hidden', 'true');
+    selectedMessageForReaction = null;
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => {
+      privateMessages.scrollTop = privateMessages.scrollHeight;
+    }, 0);
+  }
+
+  // Event listeners
+  privateChatCloseBtn.addEventListener('click', closeChat);
+  privateChat.addEventListener('click', (e) => {
+    if (e.target === privateChat) closeChat();
+  });
+
+  privateInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  privateSendBtn.addEventListener('click', sendMessage);
+  replyPreviewClose.addEventListener('click', clearReply);
+
+  document.querySelectorAll('.reaction-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      addReaction(btn.dataset.emoji);
+    });
+  });
+
+  // Close popup on outside click or when clicking the popup itself
+  document.addEventListener('click', (e) => {
+    if (reactionsPopup.getAttribute('aria-hidden') === 'false') {
+      if (!e.target.closest('.reactions-popup') && !e.target.closest('.chat-message-bubble')) {
+        closeReactionsPopup();
+      }
+    }
+  }, true);
+
+  return {
+    open: openChat,
+    close: closeChat,
+    loadMessages,
+    setReplyMessage(messageId) {
+      setReply(messageId);
+    }
+  };
+})();
+
+// Add click handler to player names/avatars in global chat to open private chat
+document.addEventListener('click', (e) => {
+  const playerNick = e.target.closest('.chat-message-nick');
+  if (playerNick && !playerNick.closest('#privateChat')) {
+    const msg = playerNick.closest('.chat-message');
+    if (msg) {
+      const receiverId = msg.dataset.playerId;
+      const receiverNick = msg.dataset.playerNick;
+      const receiverAvatar = msg.dataset.playerAvatar;
+      if (receiverId && receiverNick) {
+        PrivateChatSystem.open(receiverId, receiverNick, receiverAvatar);
+      }
+    }
+  }
+}, true);
+
+// Add swipe and double-click handlers to global chat messages
+document.addEventListener('touchstart', (e) => {
+  const msgBubble = e.target.closest('.chat-message-bubble');
+  if (msgBubble && !msgBubble.closest('#privateChat') && msgBubble.closest('#chatModal')) {
+    msgBubble.dataset.touchStartX = e.touches[0].clientX;
+    msgBubble.dataset.touchStartY = e.touches[0].clientY;
+  }
+}, true);
+
+document.addEventListener('touchend', (e) => {
+  const msgBubble = e.target.closest('.chat-message-bubble');
+  if (msgBubble && !msgBubble.closest('#privateChat') && msgBubble.closest('#chatModal')) {
+    const startX = parseFloat(msgBubble.dataset.touchStartX);
+    const startY = parseFloat(msgBubble.dataset.touchStartY);
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const swipeDistance = startX - endX;
+    const verticalDistance = Math.abs(endY - startY);
+
+    if (swipeDistance > 50 && verticalDistance < 30) {
+      const msg = msgBubble.closest('.chat-message');
+      if (msg) {
+        const messageId = msg.dataset.messageId;
+        if (messageId) {
+          msgBubble.classList.add('reply-active');
+          ChatSystem.setGlobalReply(Number(messageId));
+          setTimeout(() => {
+            msgBubble.classList.remove('reply-active');
+          }, 300);
+        }
+      }
+    }
+  }
+}, true);
+
+document.addEventListener('dblclick', (e) => {
+  const msgBubble = e.target.closest('.chat-message-bubble');
+  if (msgBubble && !msgBubble.closest('#privateChat') && msgBubble.closest('#chatModal')) {
+    e.preventDefault();
+    const msg = msgBubble.closest('.chat-message');
+    if (msg) {
+      // Auto-add heart reaction on double-click in global chat
+      const messageId = msg.dataset.messageId;
+      if (messageId) {
+        // Add visual feedback
+        msgBubble.classList.add('reaction-added');
+        setTimeout(() => {
+          msgBubble.classList.remove('reaction-added');
+        }, 400);
+
+        // Add reaction to database
+        supabaseClient
+          .from('message_reactions')
+          .insert([{
+            message_id: Number(messageId),
+            message_type: 'global',
+            player_id: globalState?.currentPlayerId,
+            player_nick: getCurrentPlayer(globalState).nick || 'Unknown',
+            emoji: '❤️'
+          }])
+          .then(({ error }) => {
+            if (!error) {
+              // Reload reactions
+              const currentId = globalState?.currentPlayerId;
+              supabaseClient
+                .from('message_reactions')
+                .select('*')
+                .eq('message_id', Number(messageId))
+                .eq('message_type', 'global')
+                .then(({ data: reactions }) => {
+                  if (reactions) {
+                    const reactionsContainer = document.getElementById(`reactions-${messageId}`);
+                    if (reactionsContainer) {
+                      const reactionsByEmoji = {};
+                      reactions.forEach(r => {
+                        if (!reactionsByEmoji[r.emoji]) {
+                          reactionsByEmoji[r.emoji] = [];
+                        }
+                        reactionsByEmoji[r.emoji].push(r.player_nick);
+                      });
+
+                      const reactionsHtml = Object.entries(reactionsByEmoji).map(([emoji, nicks]) => {
+                        const title = nicks.join(', ');
+                        return `<span class="reaction-chip" title="${escapeAttr(title)}">${emoji} ${nicks.length}</span>`;
+                      }).join('');
+
+                      reactionsContainer.innerHTML = reactionsHtml;
+                    }
+                  }
+                });
+            }
+          });
+      }
+    }
+  }
+}, true);
+
+// Click handler to show reactions popup for global chat messages
+document.addEventListener('click', (e) => {
+  const msgBubble = e.target.closest('.chat-message-bubble');
+  if (msgBubble && !msgBubble.closest('#privateChat') && msgBubble.closest('#chatModal')) {
+    const msg = msgBubble.closest('.chat-message');
+    if (msg) {
+      const messageId = msg.dataset.messageId;
+      if (messageId) {
+        // Store the message ID for reaction
+        msgBubble.dataset.selectedMessageForReaction = messageId;
+        // Show reactions popup
+        const reactionsPopup = document.getElementById('reactionsPopup');
+        if (reactionsPopup) {
+          reactionsPopup.dataset.messageType = 'global';
+          const rect = msgBubble.getBoundingClientRect();
+          const popupWidth = 220;
+          reactionsPopup.setAttribute('aria-hidden', 'false');
+          reactionsPopup.style.position = 'fixed';
+          reactionsPopup.style.top = (rect.bottom + 8) + 'px';
+          reactionsPopup.style.left = Math.max(8, rect.left + rect.width / 2 - popupWidth / 2) + 'px';
+          reactionsPopup.style.right = 'auto';
+          reactionsPopup.style.bottom = 'auto';
+        }
+      }
+    }
+  }
+}, false);
+
+// Update reaction button click handlers to handle both global and personal messages
+document.addEventListener('click', (e) => {
+  const reactionBtn = e.target.closest('.reaction-btn');
+  if (reactionBtn) {
+    e.stopPropagation();
+    const emoji = reactionBtn.dataset.emoji;
+    const reactionsPopup = document.getElementById('reactionsPopup');
+    const messageType = reactionsPopup.dataset.messageType || 'personal';
+    
+    if (messageType === 'global') {
+      // Handle global chat reaction
+      const msgBubbles = document.querySelectorAll('.chat-message-bubble');
+      let messageId = null;
+      
+      msgBubbles.forEach(bubble => {
+        if (bubble.dataset.selectedMessageForReaction) {
+          messageId = bubble.dataset.selectedMessageForReaction;
+        }
+      });
+      
+      if (messageId) {
+        addGlobalReaction(messageId, emoji);
+      }
+    }
+    // For personal messages, the reaction is handled by PrivateChatSystem
+  }
+});
+
+async function addGlobalReaction(messageId, emoji) {
+  if (!messageId) return;
+
+  const currentPlayer = getCurrentPlayer(globalState);
+  if (!currentPlayer) return;
+
+  // Add visual feedback
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (messageEl) {
+    const bubble = messageEl.querySelector('.chat-message-bubble');
+    if (bubble) {
+      bubble.classList.add('reaction-added');
+      setTimeout(() => {
+        bubble.classList.remove('reaction-added');
+      }, 400);
+    }
+  }
+
+  try {
+    const playerId = globalState?.currentPlayerId;
+    
+    // First, delete any existing reactions from this player on this message
+    const { error: deleteError } = await supabaseClient
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', Number(messageId))
+      .eq('message_type', 'global')
+      .eq('player_id', playerId);
+
+    if (deleteError) {
+      console.error('Ошибка при удалении старой реакции:', deleteError);
+    }
+
+    // Now add the new reaction
+    const { error: insertError } = await supabaseClient
+      .from('message_reactions')
+      .insert([{
+        message_id: Number(messageId),
+        message_type: 'global',
+        player_id: playerId,
+        player_nick: currentPlayer.nick || 'Unknown',
+        emoji: emoji
+      }]);
+
+    if (!insertError) {
+      // Reload reactions
+      supabaseClient
+        .from('message_reactions')
+        .select('*')
+        .eq('message_id', Number(messageId))
+        .eq('message_type', 'global')
+        .then(({ data: reactions }) => {
+          if (reactions) {
+            const reactionsContainer = document.getElementById(`reactions-${messageId}`);
+            if (reactionsContainer) {
+              const reactionsByEmoji = {};
+              reactions.forEach(r => {
+                if (!reactionsByEmoji[r.emoji]) {
+                  reactionsByEmoji[r.emoji] = [];
+                }
+                reactionsByEmoji[r.emoji].push(r.player_nick);
+              });
+
+              const reactionsHtml = Object.entries(reactionsByEmoji).map(([emoji, nicks]) => {
+                const title = nicks.join(', ');
+                return `<span class="reaction-chip" title="${escapeAttr(title)}">${emoji} ${nicks.length}</span>`;
+              }).join('');
+
+              reactionsContainer.innerHTML = reactionsHtml;
+            }
+          }
+        });
+    } else {
+      console.error('Ошибка при добавлении реакции:', insertError);
+    }
+  } catch (err) {
+    console.error('Ошибка при добавлении реакции:', err);
+  }
+
+  const reactionsPopup = document.getElementById('reactionsPopup');
+  if (reactionsPopup) {
+    reactionsPopup.setAttribute('aria-hidden', 'true');
+  }
+}
+
+/* ======================================================
+   MESSAGE ACTIONS MENU (3 DOTS) + GLOBAL CHAT REPLY + SEARCH
+   ====================================================== */
+
+let selectedMessageForActions = null;
+let selectedMessageChatType = null; // 'global' or 'personal'
+
+// Handle 3-dots button click to show message actions menu
+document.addEventListener('click', (e) => {
+  const actionsBtn = e.target.closest('.chat-message-actions-btn');
+  if (actionsBtn) {
+    e.stopPropagation();
+    const messageId = actionsBtn.dataset.messageId;
+    const msg = actionsBtn.closest('.chat-message');
+    
+    if (msg && messageId) {
+      selectedMessageForActions = {
+        id: messageId,
+        playerNick: msg.dataset.playerNick || msg.querySelector('.chat-message-nick')?.textContent || '',
+        playerId: msg.dataset.playerId || '',
+        isGlobal: !!msg.closest('#chatModal'),
+        element: msg
+      };
+      
+      selectedMessageChatType = selectedMessageForActions.isGlobal ? 'global' : 'personal';
+      
+      // Show/hide DM action based on if we're in global chat
+      const dmBtn = document.getElementById('dmActionBtn');
+      if (dmBtn) {
+        dmBtn.style.display = selectedMessageChatType === 'global' ? 'block' : 'none';
+      }
+      
+      // Show actions menu
+      showMessageActionsMenu(e.target, messageId);
+    }
+  }
+}, false);
+
+function showMessageActionsMenu(target, messageId) {
+  const menu = document.getElementById('messageActionsMenu');
+  if (!menu) return;
+  
+  const btn = target.closest('.chat-message-actions-btn');
+  if (!btn) return;
+  
+  const rect = btn.getBoundingClientRect();
+  
+  menu.setAttribute('aria-hidden', 'false');
+  menu.style.position = 'fixed';
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.right = Math.max(4, window.innerWidth - rect.right) + 'px';
+  menu.style.left = 'auto';
+}
+
+// Handle message actions menu items clicks
+document.addEventListener('click', (e) => {
+  const actionItem = e.target.closest('.message-action-item');
+  if (actionItem && selectedMessageForActions) {
+    e.stopPropagation();
+    const action = actionItem.dataset.action;
+    
+    if (action === 'reply') {
+      handleReplyAction();
+    } else if (action === 'react') {
+      handleReactAction();
+    } else if (action === 'dm') {
+      handleDMAction();
+    }
+    
+    closeMessageActionsMenu();
+  }
+});
+
+function handleReplyAction() {
+  if (!selectedMessageForActions) {
+    console.warn('selectedMessageForActions is null');
+    return;
+  }
+  
+  console.log('handleReplyAction called. Chat type:', selectedMessageChatType, 'Message:', selectedMessageForActions);
+  
+  if (selectedMessageChatType === 'global') {
+    // For global chat, show reply preview
+    console.log('Calling ChatSystem.setGlobalReply with ID:', selectedMessageForActions.id);
+    ChatSystem.setGlobalReply(selectedMessageForActions.id);
+  } else {
+    // For private chat, show reply preview
+    const msgId = selectedMessageForActions.id;
+    const msg = selectedMessageForActions.element;
+    
+    if (msg) {
+      msg.classList.add('reply-active');
+      setTimeout(() => msg.classList.remove('reply-active'), 300);
+    }
+    
+    // Call setReply through PrivateChatSystem
+    PrivateChatSystem.setReplyMessage(msgId);
+  }
+}
+
+function handleReactAction() {
+  if (!selectedMessageForActions) return;
+  
+  const reactionsPopup = document.getElementById('reactionsPopup');
+  if (!reactionsPopup) return;
+  
+  // Store message ID for reaction in the appropriate place
+  if (selectedMessageChatType === 'global') {
+    const msgBubble = selectedMessageForActions.element?.querySelector('.chat-message-bubble');
+    if (msgBubble) {
+      msgBubble.dataset.selectedMessageForReaction = selectedMessageForActions.id;
+    }
+    reactionsPopup.dataset.messageType = 'global';
+  } else {
+    reactionsPopup.dataset.messageType = 'personal';
+  }
+  
+  // Show reactions popup below the message
+  const btn = selectedMessageForActions.element?.querySelector('.chat-message-actions-btn');
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    reactionsPopup.setAttribute('aria-hidden', 'false');
+    reactionsPopup.style.position = 'fixed';
+    reactionsPopup.style.top = (rect.bottom + 8) + 'px';
+    reactionsPopup.style.left = Math.max(8, rect.left) + 'px';
+    reactionsPopup.style.right = 'auto';
+    reactionsPopup.style.bottom = 'auto';
+  }
+}
+
+function handleDMAction() {
+  if (!selectedMessageForActions) return;
+  
+  PrivateChatSystem.open(
+    selectedMessageForActions.playerId,
+    selectedMessageForActions.playerNick,
+    selectedMessageForActions.element?.dataset.playerAvatar || ''
+  );
+}
+
+function closeMessageActionsMenu() {
+  const menu = document.getElementById('messageActionsMenu');
+  if (menu) {
+    menu.setAttribute('aria-hidden', 'true');
+  }
+  selectedMessageForActions = null;
+}
+
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.message-actions-menu') && !e.target.closest('.chat-message-actions-btn')) {
+    closeMessageActionsMenu();
+  }
+}, true);
+
+// ======== FRIEND SEARCH MODAL (ALL REGISTERED PLAYERS) ========
+
+const friendSearchBackdrop = document.getElementById('friendSearchBackdrop');
+const friendSearchModal = document.getElementById('friendSearchModal');
+const friendSearchInput = document.getElementById('friendSearchInput');
+const friendSearchResults = document.getElementById('friendSearchResults');
+const friendSearchClose = document.getElementById('friendSearchClose');
+
+// Friend search modal logic
+async function openFriendSearchModal() {
+  if (!friendSearchBackdrop || !friendSearchModal) return;
+  
+  friendSearchBackdrop.style.display = 'flex';
+  friendSearchInput.focus();
+  
+  // Load all players if not already loaded
+  await loadAllPlayers();
+}
+
+function closeFriendSearchModal() {
+  if (friendSearchBackdrop) {
+    friendSearchBackdrop.style.display = 'none';
+  }
+  friendSearchInput.value = '';
+  friendSearchResults.innerHTML = '<div class="friend-search-empty">Начните вводить ник для поиска...</div>';
+}
+
+let allPlayers = [];
+
+async function loadAllPlayers() {
+  if (allPlayers.length > 0) return; // Already loaded
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('players')
+      .select('id, nick, stats:stats->photo_url')
+      .limit(1000);
+    
+    if (error) {
+      console.error('Ошибка загрузки игроков:', error);
+      return;
+    }
+    
+    allPlayers = data || [];
+    console.log('Загружено игроков:', allPlayers.length);
+  } catch (err) {
+    console.error('Ошибка при загрузке всех игроков:', err);
+  }
+}
+
+function renderFriendSearchResults() {
+  const query = friendSearchInput.value.toLowerCase().trim();
+  
+  if (query.length < 2) {
+    friendSearchResults.innerHTML = '<div class="friend-search-empty">Введите минимум 2 символа...</div>';
+    return;
+  }
+  
+  const filtered = allPlayers.filter(p => 
+    p.nick.toLowerCase().includes(query)
+  ).slice(0, 50);
+  
+  if (filtered.length === 0) {
+    friendSearchResults.innerHTML = '<div class="friend-search-empty">Игроки не найдены</div>';
+    return;
+  }
+  
+  friendSearchResults.innerHTML = filtered.map(player => {
+    const avatarUrl = player.stats?.photo_url || getPlayerAvatar(player.nick);
+    const isImage = player.stats?.photo_url && player.stats.photo_url.startsWith('http');
+    
+    return `
+      <div class="friend-result-card" data-player-id="${escapeAttr(player.id)}" data-player-nick="${escapeAttr(player.nick)}" data-player-avatar="${escapeAttr(avatarUrl || '')}">
+        <div class="friend-result-avatar">
+          ${isImage ? `<img src="${escapeAttr(player.stats.photo_url)}" alt="">` : avatarUrl}
+        </div>
+        <div class="friend-result-info">
+          <div class="friend-result-nick">${escapeHtml(player.nick)}</div>
+          <div class="friend-result-meta">Игрок</div>
+        </div>
+        <button class="friend-result-action" type="button" title="Открыть ЛС">
+          💌
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+if (friendSearchInput) {
+  friendSearchInput.addEventListener('input', () => {
+    renderFriendSearchResults();
+  });
+}
+
+if (friendSearchResults) {
+  friendSearchResults.addEventListener('click', (e) => {
+    const btn = e.target.closest('.friend-result-action');
+    if (btn) {
+      e.stopPropagation();
+      const card = btn.closest('.friend-result-card');
+      if (card) {
+        const playerId = card.dataset.playerId;
+        const nick = card.dataset.playerNick;
+        const avatar = card.dataset.playerAvatar;
+        
+        closeFriendSearchModal();
+        PrivateChatSystem.open(playerId, nick, avatar);
+      }
+    }
+  });
+}
+
+if (friendSearchClose) {
+  friendSearchClose.addEventListener('click', closeFriendSearchModal);
+}
+
+if (friendSearchBackdrop) {
+  friendSearchBackdrop.addEventListener('click', (e) => {
+    if (e.target === friendSearchBackdrop) {
+      closeFriendSearchModal();
+    }
+  });
+}
+
+// Search functionality in global chat
+const chatSearchBtn = document.getElementById('chatSearchBtn');
+const chatSearchBox = document.getElementById('chatSearchBox');
+const chatSearchInput = document.getElementById('chatSearchInput');
+const chatSearchResults = document.getElementById('chatSearchResults');
+
+if (chatSearchBtn) {
+  chatSearchBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Open friend search modal instead of toggle search box
+    openFriendSearchModal();
+  });
+}
+
+if (chatSearchInput) {
+  chatSearchInput.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    
+    if (query.length < 1) {
+      chatSearchResults.classList.remove('active');
+      return;
+    }
+    
+    // Search through messages for player nicknames
+    const messages = document.querySelectorAll('#chatMessages .chat-message');
+    const results = [];
+    const seen = new Set();
+    
+    messages.forEach(msg => {
+      const nick = msg.dataset.playerNick || '';
+      const playerId = msg.dataset.playerId || '';
+      const avatar = msg.dataset.playerAvatar || '';
+      
+      if (nick.toLowerCase().includes(query) && !seen.has(playerId)) {
+        seen.add(playerId);
+        results.push({ playerId, nick, avatar });
+      }
+    });
+    
+    if (results.length > 0) {
+      chatSearchResults.innerHTML = results.map(r => `
+        <div class="chat-search-item" data-player-id="${escapeAttr(r.playerId)}" data-player-nick="${escapeAttr(r.nick)}" data-player-avatar="${escapeAttr(r.avatar)}">
+          <div class="chat-search-item-avatar">${r.avatar ? `<img src="${escapeAttr(r.avatar)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : getPlayerAvatar(r.nick)}</div>
+          <div>${escapeHtml(r.nick)}</div>
+        </div>
+      `).join('');
+      chatSearchResults.classList.add('active');
+    } else {
+      chatSearchResults.classList.remove('active');
+    }
+  });
+}
+
+if (chatSearchResults) {
+  chatSearchResults.addEventListener('click', (e) => {
+    const item = e.target.closest('.chat-search-item');
+    if (item) {
+      const playerId = item.dataset.playerId;
+      const nick = item.dataset.playerNick;
+      const avatar = item.dataset.playerAvatar;
+      
+      // Open private chat with the found player
+      PrivateChatSystem.open(playerId, nick, avatar);
+      
+      // Close search
+      chatSearchBox.style.display = 'none';
+      chatSearchInput.value = '';
+      chatSearchResults.classList.remove('active');
+    }
+  });
+}
+
+// Work in progress
 
 
 
