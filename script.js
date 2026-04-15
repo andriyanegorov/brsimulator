@@ -542,52 +542,66 @@ function saveState(state) {
 async function syncStateToSupabase(state) {
   try {
     // 1. Конфиг
-    await supabaseClient.from('config').upsert({
-      id: 'global',
-      rarity_chances: state.rarityChances,
-      promocodes: state.promocodes,
-      gallery_entries: state.galleryEntries,
-      case_categories: state.caseCategories
-    });
+    try {
+      await supabaseClient.from('config').upsert({
+        id: 'global',
+        rarity_chances: state.rarityChances,
+        promocodes: state.promocodes,
+        gallery_entries: state.galleryEntries,
+        case_categories: state.caseCategories
+      });
+    } catch (configErr) {
+      console.warn('[Supabase] Config sync failed:', configErr.message || configErr);
+    }
 
     // 2. Игроки
-    const playersPayload = state.players.map(p => ({
-      id: p.id,
-      nick: p.nick,
-      server: p.server,
-      balance: p.balance,
-      inventory: p.inventory,
-      stats: p.stats,
-      total_spent: Math.max(0, Math.round(p.totalSpent || 0)),
-      badges:        p.badges        || [],
-      usedPromos:    p.usedPromos    || [],
-      dailyBonus:    p.dailyBonus    || { lastClaim: 0, streak: 0 },
-      wheelLastSpun: p.wheelLastSpun || 0,
-      banned:        p.banned || false
-    }));
-    await supabaseClient.from('players').upsert(playersPayload);
+    try {
+      const playersPayload = state.players.map(p => ({
+        id: p.id,
+        nick: p.nick,
+        server: p.server,
+        balance: p.balance,
+        inventory: p.inventory,
+        stats: p.stats,
+        total_spent: Math.max(0, Math.round(p.totalSpent || 0)),
+        badges:        p.badges        || [],
+        usedPromos:    p.usedPromos    || [],
+        dailyBonus:    p.dailyBonus    || { lastClaim: 0, streak: 0 },
+        wheelLastSpun: p.wheelLastSpun || 0,
+        banned:        p.banned || false
+      }));
+      await supabaseClient.from('players').upsert(playersPayload);
+    } catch (playersErr) {
+      console.warn('[Supabase] Players sync failed:', playersErr.message || playersErr);
+    }
 
     // 3. Кейсы
-    const casesPayload = state.cases.map(c => ({
-      id: c.id,
-      name: c.name,
-      price: c.price,
-      image: c.image,
-      items: c.items,
-      category_id: c.categoryId || null
-    }));
-    const { error: casesErr } = await supabaseClient.from('cases').upsert(casesPayload);
-    if (casesErr) {
-      console.group('%c❌ Ошибка БД: Отправка кейсов (Supabase)', 'color: white; background: red; padding: 4px; border-radius: 4px;');
-      console.error(casesErr);
-      console.groupEnd();
+    try {
+      const casesPayload = state.cases.map(c => ({
+        id: c.id,
+        name: c.name,
+        price: c.price,
+        image: c.image,
+        items: c.items,
+        category_id: c.categoryId || null
+      }));
+      const { error: casesErr } = await supabaseClient.from('cases').upsert(casesPayload);
+      if (casesErr) {
+        console.warn('[Supabase] Cases sync error:', casesErr.message || casesErr);
+      }
+    } catch (casesErr) {
+      console.warn('[Supabase] Cases sync failed:', casesErr.message || casesErr);
     }
 
     // 4. Новости
-    await supabaseClient.from('news').delete().neq('id', 0);
-    const newsPayload = state.news.map((content) => ({ content }));
-    if(newsPayload.length > 0) {
-      await supabaseClient.from('news').insert(newsPayload);
+    try {
+      await supabaseClient.from('news').delete().neq('id', 0);
+      const newsPayload = state.news.map((content) => ({ content }));
+      if(newsPayload.length > 0) {
+        await supabaseClient.from('news').insert(newsPayload);
+      }
+    } catch (newsErr) {
+      console.warn('[Supabase] News sync failed (non-critical):', newsErr.message || newsErr);
     }
   } catch (err) {
     console.group('%c❌ Критическая ошибка: Синхронизация с Supabase', 'color: white; background: red; padding: 4px; border-radius: 4px;');
@@ -823,14 +837,19 @@ function computeScore(player) {
   return Math.max(0, Number(player.totalSpent || 0));
 }
 
-function showToast(message) {
+function showToast(message, type = "info") {
   const toast = document.getElementById("toast");
   if (!toast) return;
 
+  // Remove all type classes
+  toast.classList.remove("success", "error", "info", "warning");
+  // Add the new type class
+  toast.classList.add(type);
+  
   toast.textContent = message;
   toast.classList.add("show");
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.remove("show"), 1700);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
 function isCurrentPlayerBanned() {
@@ -1949,7 +1968,7 @@ function renderMainApp() {
       renderContractView();
       return;
     }
-    if (contractSelection.length >= 10) { showToast("Максимум 10 предметов"); return; }
+    if (contractSelection.length >= 10) { showToast("Максимум 10 предметов", "warning"); return; }
     if (!(player.inventory || []).some((item) => item.id === itemId)) return;
     upgradeSelection = upgradeSelection.filter((id) => id !== itemId);
     contractSelection.push(itemId);
@@ -1972,13 +1991,13 @@ function renderMainApp() {
     const player = getCurrentPlayer(state);
     if (!player || isUpgradeAnimating) return;
     if (player.banned) {
-      showToast("Игрок заблокирован, апгрейд недоступен");
+      showToast("Игрок заблокирован, апгрейд недоступен", "error");
       return;
     }
     sanitizeLabSelections(player);
     const items = labItemsFromSelection(upgradeSelection, player);
-    if (!items.length) { showToast("Добавьте предмет"); return; }
-    if (!upgradeTargetItem) { showToast("Выберите целевой предмет"); return; }
+    if (!items.length) { showToast("Добавьте предмет", "warning"); return; }
+    if (!upgradeTargetItem) { showToast("Выберите целевой предмет", "warning"); return; }
 
     const inputValue = items.reduce((sum, i) => sum + Number(i.value || 0), 0);
     const targetValue = Number(upgradeTargetItem.value || 0);
@@ -1987,7 +2006,7 @@ function renderMainApp() {
     const slider = document.getElementById("upgBalanceSlider");
     const addedBalance = slider ? (Number(slider.value) || 0) : 0;
     if (addedBalance > player.balance) {
-      showToast("Недостаточно средств");
+      showToast("Недостаточно средств", "error");
       return;
     }
     
@@ -2109,10 +2128,12 @@ function renderMainApp() {
         }
         
         if (circleOuter) circleOuter.classList.add("result-win");
-        showToast(`⚡ Успех! Получено: ${reward.name} за ${formatBC(reward.value)}`);
+        const profitLoss = targetValue - totalInput;
+        const profitText = profitLoss > 0 ? `+${formatBC(profitLoss)} прибыль` : profitLoss < 0 ? `${formatBC(Math.abs(profitLoss))} убыток` : "без изменений";
+        showToast(`✨ УСПЕХ! ${reward.name} • ${profitText}`, "success");
       } else {
         if (circleOuter) circleOuter.classList.add("result-lose");
-        showToast("❌ Апгрейд провален. Ваша ставка сгорела.");
+        showToast(`💥 ПРОВАЛ! Потеря: ${formatBC(totalInput)}`, "error");
       }
 
       isUpgradeAnimating = false;
@@ -2131,12 +2152,12 @@ function renderMainApp() {
     const player = getCurrentPlayer(state);
     if (!player || isContractAnimating) return;
     if (player.banned) {
-      showToast("Игрок заблокирован, контракт недоступен");
+      showToast("Игрок заблокирован, контракт недоступен", "error");
       return;
     }
     sanitizeLabSelections(player);
     const items = labItemsFromSelection(contractSelection, player);
-    if (items.length < 3) { showToast("Нужно минимум 3 предмета"); return; }
+    if (items.length < 3) { showToast("Нужно минимум 3 предмета", "warning"); return; }
     const stats = calcContractStats(items);
     
     player.totalSpent = Math.max(0, Number(player.totalSpent || 0) + stats.totalValue); // Учет трат в контракте: сумма всех выброшенных предметов
@@ -2149,6 +2170,7 @@ function renderMainApp() {
       consumeInventoryItems(player, contractSelection);
       contractSelection = [];
       const reward = generateContractReward(stats.totalValue);
+      const profitLoss = reward.value - stats.totalValue;
       player.inventory = player.inventory || [];
       player.inventory.push(reward);
       isContractAnimating = false;
@@ -2162,7 +2184,10 @@ function renderMainApp() {
         title: "Контракт выполнен",
         singleMeta: "Награда по контракту",
       });
-      showToast(`📜 Контракт выполнен! ${reward.name} за ${formatBC(reward.value)}`);
+      // Показываем уведомление
+      const profitText = profitLoss > 0 ? `+${formatBC(profitLoss)}` : profitLoss < 0 ? `${formatBC(Math.abs(profitLoss))}` : "0";
+      const profitEmoji = profitLoss > 0 ? "📈" : profitLoss < 0 ? "📉" : "➡️";
+      showToast(`🎁 ВЫИГРЫШ! ${reward.name} • ${profitEmoji} ${profitText}`, "success");
     }, contractDuration);
   }
 
@@ -2311,7 +2336,7 @@ function renderMainApp() {
     const player = getCurrentPlayer(state);
     if (!player) return;
     const entry = getGalleryEntriesList().find((e) => e.id === entryId && e.ownerId === player.id);
-    if (!entry) { showToast("Лот не найден"); return; }
+    if (!entry) { showToast("Лот не найден", "error"); return; }
     customizeEntryId = entryId;
     renderCustomizeModal(entry, player);
     customizeModal.inert = false;
@@ -2487,7 +2512,7 @@ function renderMainApp() {
 
     const entries = getGalleryEntriesList();
     const idx = entries.findIndex((e) => e.id === entryId && e.ownerId === player.id);
-    if (idx === -1) { showToast("Лот не найден"); return; }
+    if (idx === -1) { showToast("Лот не найден", "error"); return; }
 
     const entry = entries[idx];
     const prevCustom = entry.custom || {};
@@ -2575,7 +2600,7 @@ function renderMainApp() {
     const player = getCurrentPlayer(state);
     if (!player) return;
     const { canClaim, streak, nextReward, isExpired } = getDailyBonusInfo(player);
-    if (!canClaim) { showToast("Бонус уже получен!"); return; }
+    if (!canClaim) { showToast("Бонус уже получен!", "warning"); return; }
 
     const newStreak = isExpired ? 1 : streak + 1;
     player.dailyBonus = { lastClaim: Date.now(), streak: newStreak };
@@ -2844,13 +2869,13 @@ function renderMainApp() {
     const entries = getGalleryEntriesList();
     const myEntries = entries.filter((entry) => entry.ownerId === player.id);
     if (myEntries.length >= 5) {
-      showToast("Лимит выставки уже достигнут");
+      showToast("Лимит выставки уже достигнут", "error");
       return;
     }
 
     const item = (player.inventory || []).find((inv) => inv.id === itemId);
     if (!item) {
-      showToast("Предмет не найден в инвентаре");
+      showToast("Предмет не найден в инвентаре", "error");
       return;
     }
 
@@ -2872,7 +2897,7 @@ function renderMainApp() {
     saveState(state);
     galleryPage = 1;
     renderGallerySection();
-    showToast("Предмет добавлен на выставку");
+    showToast("Предмет добавлен на выставку", "success");
 
     const updatedEntries = nextEntries.filter((entry) => entry.ownerId === player.id);
     const availableItems = getEligibleGalleryItems(player, updatedEntries);
@@ -2892,7 +2917,7 @@ function renderMainApp() {
     saveState(state);
     galleryPage = 1;
     renderGallerySection();
-    showToast("Предмет снят с витрины");
+    showToast("Предмет снят с витрины", "info");
   }
 
   function toggleGalleryLike(entryId) {
@@ -2903,7 +2928,7 @@ function renderMainApp() {
     if (index === -1) return;
     const entry = entries[index];
     if (entry.ownerId === player.id) {
-      showToast("Нельзя лайкнуть свой предмет");
+      showToast("Нельзя лайкнуть свой предмет", "warning");
       return;
     }
 
@@ -3375,23 +3400,23 @@ function renderMainApp() {
 
     if (!selectedCase || !player) return;
     if (player.banned) {
-      showToast("Игрок заблокирован, доступ к кейсам закрыт");
+      showToast("Игрок заблокирован, доступ к кейсам закрыт", "error");
       return;
     }
     if (mode !== "quick" && isSpinning) {
-      showToast("Подождите завершения анимации");
+      showToast("Подождите завершения анимации", "warning");
       return;
     }
 
     if (!selectedCase.items.length) {
-      showToast("В кейсе нет предметов");
+      showToast("В кейсе нет предметов", "error");
       return;
     }
 
     const multiplier = Math.max(1, Math.min(selectedOpenMultiplier, 10));
     const totalCost = Number(selectedCase.price || 0) * multiplier;
     if (player.balance < totalCost) {
-      showToast("Недостаточно BC для открытия");
+      showToast("Недостаточно BC для открытия", "error");
       return;
     }
 
@@ -3582,6 +3607,13 @@ function renderMainApp() {
 
   function openDropModalFromItems(items, options = {}) {
     if (!items || !items.length) return;
+    
+    // Find modal elements fresh each time
+    const modal = document.getElementById("dropModal");
+    const dropModalTitle = document.getElementById("dropModalTitle");
+    const dropModalContent = document.getElementById("dropModalContent");
+    const dropModalClose = document.getElementById("dropModalClose");
+    
     if (!modal) {
       console.warn("[DropModal] Element #dropModal not found");
       return;
@@ -3687,7 +3719,7 @@ function renderMainApp() {
       const rarityClass = getRarityClassName(item.rarity);
       if (dropRarityBadge) {
         dropRarityBadge.textContent = rarityLabel(item.rarity);
-        dropRarityBadge.className = `drop-rarity-pill rarity-${rarityClass}`;
+        dropRarityBadge.className = `drop-rarity-badge rarity-${rarityClass}`;
       }
       if (dropValueEl) {
         dropValueEl.textContent = formatBC(item.value);
@@ -3792,7 +3824,7 @@ function renderMainApp() {
       const player = getCurrentPlayer(state);
       if (!player) return;
       if (player.banned) {
-        showToast("Игрок заблокирован, изменение профиля недоступно");
+        showToast("Игрок заблокирован, изменение профиля недоступно", "error");
         return;
       }
 
@@ -3800,12 +3832,12 @@ function renderMainApp() {
       const serverValue = serverInput.value.trim();
       
       if (!nickValue) {
-        showToast("Введите никнейм");
+        showToast("Введите никнейм", "warning");
         return;
       }
       
       if (!serverValue) {
-        showToast("Выберите сервер");
+        showToast("Выберите сервер", "warning");
         return;
       }
 
@@ -3822,7 +3854,7 @@ function renderMainApp() {
 
       renderTop();
       syncPlayerUI();
-      showToast("Профиль обновлен");
+      showToast("Профиль обновлен", "success");
     });
   }
 
@@ -4016,7 +4048,7 @@ function renderMainApp() {
   if (activatePromoBtn && promoInput) {
     activatePromoBtn.addEventListener("click", () => {
       if (isCurrentPlayerBanned()) {
-        showToast("Игрок заблокирован, промокод недоступен");
+        showToast("Игрок заблокирован, промокод недоступен", "error");
         return;
       }
       const code = promoInput.value.trim().toUpperCase();
@@ -4102,7 +4134,7 @@ function renderMainApp() {
     bonusDailyCard.addEventListener("click", (e) => {
       if (e.target.id === "claimDailyBtn") {
         if (isCurrentPlayerBanned()) {
-          showToast("Игрок заблокирован, бонус недоступен");
+          showToast("Игрок заблокирован, бонус недоступен", "error");
           return;
         }
         claimDailyBonus();
@@ -4114,7 +4146,7 @@ function renderMainApp() {
     bonusWheelCard.addEventListener("click", (e) => {
       if (e.target.id === "openWheelBtn") {
         if (isCurrentPlayerBanned()) {
-          showToast("Игрок заблокирован, колесо недоступно");
+          showToast("Игрок заблокирован, колесо недоступно", "error");
           return;
         }
         openWheelModal();
@@ -5868,6 +5900,53 @@ const PrivateChatSystem = (function () {
     reactionsPopup.style.bottom = 'auto';
   }
 
+  async function notifyTelegramAboutMessage(receiverId, senderNick, messageText) {
+    try {
+      const isLocalDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+      const endpoint = isLocalDev
+        ? 'https://black-russia-simulator.vercel.app/api/notify-private-message'
+        : '/api/notify-private-message';
+
+      const payload = {
+        receiver_id: receiverId,
+        sender_nick: senderNick,
+        message: messageText
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        console.warn('[NotifyTelegram] Failed to send notification:', response.status);
+      }
+    } catch (err) {
+      const isLocalDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+      if (isLocalDev) {
+        try {
+          // no-cors fallback for local static hosts where preflight can be blocked
+          await fetch('https://black-russia-simulator.vercel.app/api/notify-private-message', {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            body: JSON.stringify({
+              receiver_id: receiverId,
+              sender_nick: senderNick,
+              message: messageText
+            })
+          });
+          return;
+        } catch (fallbackErr) {
+          console.warn('[NotifyTelegram] Local fallback failed:', fallbackErr.message);
+        }
+      }
+
+      console.warn('[NotifyTelegram] Error:', err.message);
+    }
+  }
+
   async function sendMessage() {
     const text = privateInput.value.trim();
     if (!text || !currentReceiverId) return;
@@ -5895,6 +5974,8 @@ const PrivateChatSystem = (function () {
         console.error('Ошибка отправки личного сообщения:', error);
         privateInput.value = text;
       } else {
+        // Отправляем уведомление в Telegram
+        notifyTelegramAboutMessage(currentReceiverId, currentPlayer.nick || 'Unknown', text);
         clearReply();
         await loadMessages();
       }

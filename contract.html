@@ -100,6 +100,53 @@
         </section>
       </main>
 
+      <!-- Drop Modal (Результаты контрактов) -->
+      <div class="modal" id="dropModal" aria-hidden="true">
+        <div class="modal-card drop-modal-card">
+          <div class="drop-modal-header">
+            <h2 class="drop-modal-title" id="dropModalTitle">🎁 Выпал предмет</h2>
+            <button class="drop-modal-close" id="dropModalCloseBtn" type="button" aria-label="Закрыть">×</button>
+          </div>
+          
+          <div id="dropSingleView" class="drop-single-view">
+            <div class="drop-item-container">
+              <div class="drop-image-large">
+                <img id="dropImg" src="" alt="">
+              </div>
+              <div class="drop-info-center">
+                <span id="dropRarityBadge" class="drop-rarity-badge">---</span>
+                <h3 id="dropName" class="drop-item-name">---</h3>
+                <p id="dropDesc" class="drop-item-desc"></p>
+                <div class="drop-value-box">
+                  <span class="drop-label">Стоимость:</span>
+                  <div class="drop-value" id="dropValue">0 BC</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="dropMultiView" class="drop-multi-view">
+            <div class="drop-multi-label">Вы получили серию предметов:</div>
+            <div class="drop-multi-grid" id="dropMultiList"></div>
+            <div id="dropMultiSummary" class="drop-multi-summary is-hidden">
+              <div class="summary-item">
+                <span class="summary-label">Сумма серии:</span>
+                <strong id="dropMultiTotal">0 BC</strong>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Лучший дроп:</span>
+                <strong id="dropMultiBest">---</strong>
+              </div>
+            </div>
+          </div>
+          
+          <div class="drop-actions">
+            <button class="btn btn-primary" id="closeModalBtn" type="button">✓ Забрать в инвентарь</button>
+            <button class="btn btn-secondary" id="sellDropBtn" type="button">💰 Продать предмет</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Chat Button (Top Right) -->
       <button class="chat-fab" id="chatFabBtn" type="button" title="Открыть чат" aria-label="Открыть общий чат">
         <span class="chat-fab-icon">💬</span>
